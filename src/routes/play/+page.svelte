@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { randomNumberGenerator } from '$lib';
 	import FlipText from '$lib/FlipText.svelte';
+	import { untrack } from 'svelte';
 	import { Confetti } from 'svelte-confetti';
 
 	const { data } = $props();
@@ -17,6 +18,14 @@
 	let attempt = $state('');
 	let selectionStart = $state(0);
 	let selectionEnd = $state(0);
+	let startTime = $state(Date.now());
+	let endTime = $state(0);
+	let time = $state(0); // number of seconds since the start of the game
+	const timeDisplay = $derived.by(() => {
+		const minutes = Math.floor(time / 60);
+		const seconds = time % 60;
+		return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+	});
 	const usedLetters = $derived.by(() => {
 		const letters = new Set<number>();
 		attempt.split('').forEach((letter) => {
@@ -26,6 +35,24 @@
 		});
 		return letters;
 	});
+
+	function share() {
+		const shareURL = `https://scrmbld.pages.dev`;
+		const shareText = `🅂🄲🅁🄼🄱🄻🄳 ⏲${timeDisplay}`;
+		const twitterUrl = new URL(`https://twitter.com/intent/tweet`);
+		twitterUrl.searchParams.set('text', shareText);
+		// twitterUrl.searchParams.set('url', shareURL);
+		window.open(twitterUrl.href, '_blank');
+		// if (navigator.share) {
+		// 	navigator.share({
+		// 		title: '🅂🄲🅁🄼🄱🄻🄳',
+		// 		text: shareText,
+		// 		url: shareURL
+		// 	});
+		// } else {
+		// 	navigator.clipboard.writeText(`${shareText}\n${shareURL}`);
+		// }
+	}
 
 	function shuffle() {
 		shuffling = true;
@@ -96,6 +123,11 @@
 	});
 
 	$effect(() => {
+		if (endTime) return;
+		if (answer && attempt === answer) endTime = Date.now();
+	});
+
+	$effect(() => {
 		if (!answerEl || attempt.length < 7) return;
 		if (attempt !== answer) {
 			answerEl.animate(
@@ -113,6 +145,18 @@
 			);
 		}
 	});
+
+	let interval: ReturnType<typeof setInterval> | undefined;
+	$effect(() => {
+		clearInterval(interval);
+		if (endTime) return;
+		untrack(() => {
+			interval = setInterval(() => {
+				const now = Date.now();
+				time = Math.round((now - startTime) / 1000);
+			}, 1000);
+		});
+	});
 </script>
 
 <svelte:window onkeyup={onWindowKeyUp} />
@@ -122,7 +166,7 @@
 		<Confetti
 			colorRange={[120, 250]}
 			x={[-5, 5]}
-			y={[0, 5]}
+			y={[0, 8]}
 			amount={200}
 			fallDistance="50vh"
 			iterationCount={1}
@@ -131,6 +175,9 @@
 {/if}
 
 <article>
+	<div class="timer">
+		<FlipText word={timeDisplay} minLength={4} duration={200} />
+	</div>
 	<div class="question">
 		<FlipText word={scrambled} {usedLetters} />
 	</div>
@@ -185,16 +232,21 @@
 		/>
 	</div>
 	<div class="actions">
-		<button class="primary" disabled={shuffling} onclick={() => (scrambled = shuffle())}
-			>Shuffle</button
-		>
-		{#if mixletters.length > 0}
-			<button style="font-size: 1.5rem;" onclick={() => removeExtraLetter()}>Hint</button>
+		{#if endTime}
+			<button class="primary" onclick={share}>Share</button>
+		{:else}
+			<button disabled={shuffling} onclick={() => (scrambled = shuffle())}>Shuffle</button>
+			{#if mixletters.length > 0}
+				<button onclick={() => removeExtraLetter()}>Hint</button>
+			{/if}
 		{/if}
 	</div>
 </article>
 
 <style lang="scss">
+	.timer {
+		margin-bottom: 1rem;
+	}
 	.confetti {
 		position: fixed;
 		bottom: 0;
@@ -202,24 +254,29 @@
 	}
 	article {
 		display: flex;
-		justify-content: center;
-		align-items: center;
 		flex-direction: column;
+		align-items: center;
 		max-width: 100vw;
 		overflow: hidden;
 		min-height: 100vh;
+		padding: 2rem 0;
+		@media (min-width: 768px) {
+			justify-content: center;
+			padding: 0;
+		}
 	}
 	.actions {
 		display: flex;
-		flex-direction: column;
+		flex-direction: row;
 		justify-content: center;
 		align-items: center;
 		gap: 1rem;
 		margin-top: 2rem;
+		margin-bottom: 4rem;
 	}
 	button {
 		cursor: pointer;
-		font-size: 2rem;
+		font-size: 1.5rem;
 		text-decoration: none;
 		border-radius: 999px;
 		padding: 0.5rem 1.5rem;
@@ -228,7 +285,7 @@
 		outline: none;
 		box-shadow: none;
 		border: none;
-		background-color: transparent;
+		background-color: rgba(255, 255, 255, 0.05);
 		color: #eeeeee;
 		&:hover {
 			background-color: rgba(255, 255, 255, 0.1);
