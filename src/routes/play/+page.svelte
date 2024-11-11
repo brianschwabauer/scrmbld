@@ -1,6 +1,9 @@
 <script lang="ts">
+	import { assets } from '$app/paths';
 	import { randomNumberGenerator } from '$lib';
 	import FlipText from '$lib/FlipText.svelte';
+	import Popover from '$lib/Popover.svelte';
+	import { tooltip } from '$lib/tootltip.js';
 	import { untrack } from 'svelte';
 	import { Confetti } from 'svelte-confetti';
 
@@ -21,6 +24,13 @@
 	let startTime = $state(Date.now());
 	let endTime = $state(0);
 	let time = $state(0); // number of seconds since the start of the game
+	let didCopyToClipboard = $state(false);
+	let shareButtonEl = $state<HTMLButtonElement | undefined>(undefined);
+	const useNativeShare = $derived(
+		typeof navigator !== undefined &&
+			'share' in navigator &&
+			!navigator.userAgent.includes('Windows')
+	);
 	const timeDisplay = $derived.by(() => {
 		const minutes = Math.floor(time / 60);
 		const seconds = time % 60;
@@ -35,23 +45,38 @@
 		});
 		return letters;
 	});
+	const shareURL = `https://scrmbld.app`;
+	const shareText = $derived(`🅂🄲🅁🄼🄱🄻🄳 ⏲${timeDisplay}`);
 
-	function share() {
-		const shareURL = `https://scrmbld.pages.dev`;
-		const shareText = `🅂🄲🅁🄼🄱🄻🄳 ⏲${timeDisplay}`;
+	function openNativeShare() {
+		if (!useNativeShare || !navigator.share) return;
+		navigator.share({
+			title: '🅂🄲🅁🄼🄱🄻🄳',
+			text: shareText
+			// url: shareURL
+		});
+	}
+
+	function shareOnTwitter() {
 		const twitterUrl = new URL(`https://twitter.com/intent/tweet`);
 		twitterUrl.searchParams.set('text', shareText);
 		// twitterUrl.searchParams.set('url', shareURL);
 		window.open(twitterUrl.href, '_blank');
-		// if (navigator.share) {
-		// 	navigator.share({
-		// 		title: '🅂🄲🅁🄼🄱🄻🄳',
-		// 		text: shareText,
-		// 		url: shareURL
-		// 	});
-		// } else {
-		// 	navigator.clipboard.writeText(`${shareText}\n${shareURL}`);
-		// }
+	}
+
+	function shareOnFacebook() {
+		const twitterUrl = new URL(`https://www.facebook.com/share.php`);
+		twitterUrl.searchParams.set('[title]', shareText);
+		twitterUrl.searchParams.set('u', shareURL);
+		window.open(twitterUrl.href, '_blank');
+	}
+
+	function shareToClipboard() {
+		navigator.clipboard.writeText(shareText);
+		didCopyToClipboard = true;
+		setTimeout(() => {
+			didCopyToClipboard = false;
+		}, 5000);
 	}
 
 	function shuffle() {
@@ -233,7 +258,45 @@
 	</div>
 	<div class="actions">
 		{#if endTime}
-			<button class="primary" onclick={share}>Share</button>
+			<button class="primary" onclick={openNativeShare} bind:this={shareButtonEl}>Share</button>
+			{#if !useNativeShare}
+				<Popover refElement={shareButtonEl} openOnClick>
+					<div class="share-popover">
+						<h3>{shareText}</h3>
+						<div class="buttons">
+							<button
+								onclick={shareToClipboard}
+								aria-label="Copy share text"
+								use:tooltip={'Copy score to clipboard'}
+							>
+								<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24"
+									><path
+										fill="currentColor"
+										d="M9 18q-.825 0-1.412-.587T7 16V4q0-.825.588-1.412T9 2h9q.825 0 1.413.588T20 4v12q0 .825-.587 1.413T18 18zm-4 4q-.825 0-1.412-.587T3 20V6h2v14h11v2z"
+									></path></svg
+								>
+							</button>
+							<button
+								onclick={shareOnTwitter}
+								class="twitter"
+								use:tooltip={'Share score on Twitter/X'}
+							>
+								<img src="{assets}/x.svg" alt="Twitter Logo" />
+							</button>
+							<button
+								onclick={shareOnFacebook}
+								class="facebook"
+								use:tooltip={'Share score on Facebook'}
+							>
+								<img src="{assets}/facebook.png" alt="Facebook Logo" />
+							</button>
+						</div>
+						{#if didCopyToClipboard}
+							<p>Copied to clipboard!</p>
+						{/if}
+					</div>
+				</Popover>
+			{/if}
 		{:else}
 			<button disabled={shuffling} onclick={() => (scrambled = shuffle())}>Shuffle</button>
 			{#if mixletters.length > 0}
@@ -360,6 +423,54 @@
 			letter-spacing: 0.22em;
 			text-align: left;
 			opacity: 0;
+		}
+	}
+
+	.share-popover {
+		color: #333333;
+		padding: 2rem;
+		text-align: center;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 1rem 0.5rem;
+		h3 {
+			padding: 0;
+			margin: 0 0 1rem;
+			font-size: 2rem;
+		}
+		.buttons {
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			gap: 0.5rem;
+		}
+		button {
+			width: 3rem;
+			height: 3rem;
+			border-radius: 100%;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			padding: 0;
+			margin: 0;
+			background-color: #eeeeee;
+			color: #333333;
+			svg,
+			img {
+				width: 1.5rem;
+				height: 1.5rem;
+			}
+			&.twitter {
+				background-color: black;
+			}
+			&.facebook {
+				img {
+					width: 100%;
+					height: 100%;
+				}
+			}
 		}
 	}
 </style>
