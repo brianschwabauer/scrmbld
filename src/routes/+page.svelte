@@ -8,7 +8,7 @@
 		<FlipText word="SCRMBLD" />
 	</header>
 	<section>
-		<p>Find the 7 letter word in 10 scrambled letters</p>
+		<p>Find the 7 letter word in 8 scrambled letters</p>
 		<a href="/play">Play</a>
 	</section>
 </article>

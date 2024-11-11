@@ -14,7 +14,7 @@
 	const todaysWord = $derived(words.findLast(({ day }) => today >= day) || words[0]);
 	const answer = $derived(todaysWord.word[0].toUpperCase());
 	const random = randomNumberGenerator();
-	let mixletters = $state(todaysWord.word.slice(1));
+	let mixletters = $state(todaysWord.word.slice(1, 2));
 	let inputEl = $state<HTMLInputElement | undefined>(undefined);
 	let answerEl = $state<HTMLDivElement | undefined>(undefined);
 	let shuffling = $state(false);
