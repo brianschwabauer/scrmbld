@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { browser } from '$app/environment';
 	import { assets } from '$app/paths';
 	import { randomNumberGenerator } from '$lib';
 	import FlipText from '$lib/FlipText.svelte';
@@ -10,10 +11,10 @@
 	const { data } = $props();
 	const words = $derived(data.words);
 	const today = $derived(new Date().setHours(0, 0, 0, 0));
-	const todaysWord = $derived(words.findLast(({ day }) => today >= day)?.word || words[0]?.word);
-	const answer = $derived(todaysWord[0].toUpperCase());
+	const todaysWord = $derived(words.findLast(({ day }) => today >= day) || words[0]);
+	const answer = $derived(todaysWord.word[0].toUpperCase());
 	const random = randomNumberGenerator();
-	let mixletters = $state(todaysWord.slice(1));
+	let mixletters = $state(todaysWord.word.slice(1));
 	let inputEl = $state<HTMLInputElement | undefined>(undefined);
 	let answerEl = $state<HTMLDivElement | undefined>(undefined);
 	let shuffling = $state(false);
@@ -21,13 +22,18 @@
 	let attempt = $state('');
 	let selectionStart = $state(0);
 	let selectionEnd = $state(0);
-	let startTime = $state(Date.now());
-	let endTime = $state(0);
-	let time = $state(0); // number of seconds since the start of the game
+	let success = $state(false);
+	let times = $state<number[][]>([]);
+	const time = $derived(
+		times.reduce((total, [start, end]) => {
+			return total + Math.max(0, Math.round((end - start) / 1000));
+		}, 0)
+	); // number of seconds since the start of the game
 	let didCopyToClipboard = $state(false);
 	let shareButtonEl = $state<HTMLButtonElement | undefined>(undefined);
 	const useNativeShare = $derived(
-		typeof navigator !== undefined &&
+		browser &&
+			typeof navigator !== undefined &&
 			'share' in navigator &&
 			!navigator.userAgent.includes('Windows')
 	);
@@ -49,7 +55,7 @@
 	const shareText = $derived(`🅂🄲🅁🄼🄱🄻🄳 ⏲${timeDisplay}`);
 
 	function openNativeShare() {
-		if (!useNativeShare || !navigator.share) return;
+		if (!useNativeShare || typeof navigator === 'undefined' || !navigator.share) return;
 		navigator.share({
 			title: '🅂🄲🅁🄼🄱🄻🄳',
 			text: shareText
@@ -72,6 +78,7 @@
 	}
 
 	function shareToClipboard() {
+		if (typeof navigator === 'undefined') return;
 		navigator.clipboard.writeText(shareText);
 		didCopyToClipboard = true;
 		setTimeout(() => {
@@ -148,8 +155,16 @@
 	});
 
 	$effect(() => {
-		if (endTime) return;
-		if (answer && attempt === answer) endTime = Date.now();
+		if (success) return;
+		if (answer && attempt === answer) {
+			if (times[times.length - 1]) times[times.length - 1][1] = Date.now();
+			success = true;
+			clearInterval(interval);
+			localStorage.setItem(
+				`scrmbld_${todaysWord.day}`,
+				JSON.stringify({ ...todaysWord, times, success })
+			);
+		}
 	});
 
 	$effect(() => {
@@ -174,13 +189,41 @@
 	let interval: ReturnType<typeof setInterval> | undefined;
 	$effect(() => {
 		clearInterval(interval);
-		if (endTime) return;
+		if (success) return;
+		if (!times.length) {
+			try {
+				const savedInfo = JSON.parse(localStorage.getItem(`scrmbld_${todaysWord.day}`) || '');
+				if (savedInfo) {
+					times = savedInfo.times;
+					success = savedInfo.success ?? false;
+					if (success) {
+						attempt = answer;
+					}
+				}
+			} catch (error) {
+				// ignore
+			}
+		}
+		if (!times.length) {
+			const now = Date.now();
+			times.push([now, now]);
+		}
 		untrack(() => {
 			interval = setInterval(() => {
+				if (success || !times.length) return;
 				const now = Date.now();
-				time = Math.round((now - startTime) / 1000);
+				if (times[times.length - 1][1] < now - 3000) {
+					times.push([now, now]);
+				} else {
+					times[times.length - 1][1] = now;
+				}
+				localStorage.setItem(
+					`scrmbld_${todaysWord.day}`,
+					JSON.stringify({ ...todaysWord, times, success })
+				);
 			}, 1000);
 		});
+		return () => clearInterval(interval);
 	});
 </script>
 
@@ -257,7 +300,7 @@
 		/>
 	</div>
 	<div class="actions">
-		{#if endTime}
+		{#if success}
 			<button class="primary" onclick={openNativeShare} bind:this={shareButtonEl}>Share</button>
 			{#if !useNativeShare}
 				<Popover refElement={shareButtonEl} openOnClick>
