@@ -3,6 +3,7 @@
 	import { assets } from '$app/paths';
 	import { randomNumberGenerator } from '$lib';
 	import FlipText from '$lib/FlipText.svelte';
+	import Keyboard from '$lib/Keyboard.svelte';
 	import Popover from '$lib/Popover.svelte';
 	import { tooltip } from '$lib/tootltip.js';
 	import { untrack } from 'svelte';
@@ -136,26 +137,18 @@
 
 	let timer: ReturnType<typeof setTimeout> | undefined;
 	function onWindowKeyUp(e: KeyboardEvent) {
-		function debounceFocus() {
-			clearTimeout(timer);
-			timer = setTimeout(() => {
-				inputEl?.focus();
-			}, 100);
-		}
 		if (!inputEl) return;
 		if (e.target === inputEl || inputEl === document.activeElement) return;
 		if (e.ctrlKey || e.metaKey || e.altKey) return;
 		if (e.key === 'ArrowLeft') {
 			selectionStart = Math.max(selectionStart - 1, 0);
 			selectionEnd = Math.max(selectionStart, 1);
-			debounceFocus();
 			inputEl.setSelectionRange(selectionStart, selectionEnd);
 			return;
 		}
 		if (e.key === 'ArrowRight') {
 			selectionEnd = Math.min(selectionEnd + 1, 7);
 			selectionStart = Math.min(selectionEnd, 6);
-			debounceFocus();
 			inputEl.setSelectionRange(selectionStart, selectionEnd);
 			return;
 		}
@@ -164,7 +157,6 @@
 			attempt = attempt.slice(0, selectionStart) + attempt.slice(selectionEnd);
 			selectionStart++;
 			selectionEnd = selectionStart;
-			debounceFocus();
 			inputEl.setSelectionRange(selectionStart, selectionEnd);
 			return;
 		}
@@ -173,15 +165,8 @@
 		attempt = attempt.slice(0, selectionStart) + key + attempt.slice(selectionEnd);
 		selectionStart++;
 		selectionEnd = selectionStart;
-		debounceFocus();
 		inputEl.setSelectionRange(selectionStart, selectionEnd);
 	}
-
-	$effect(() => {
-		if (inputEl) {
-			inputEl.focus();
-		}
-	});
 
 	$effect(() => {
 		if (success) return;
@@ -403,6 +388,17 @@
 			{/if}
 		{/if}
 	</div>
+	<Keyboard
+		onclick={(key) => {
+			if (key === 'Clear') {
+				attempt = '';
+				selectionStart = 0;
+				selectionEnd = 0;
+				return;
+			}
+			window.dispatchEvent(new KeyboardEvent('keyup', { key }));
+		}}
+	></Keyboard>
 </article>
 
 <style lang="scss">
@@ -421,10 +417,16 @@
 		max-width: 100vw;
 		overflow: hidden;
 		min-height: 100vh;
-		padding: 2rem 0;
+		padding: 4rem 0;
 		@media (min-width: 768px) {
 			justify-content: center;
 			padding: 0;
+		}
+		@media (max-width: 769px) {
+			:global(.keyboard) {
+				position: fixed;
+				bottom: 4rem;
+			}
 		}
 	}
 	.actions {
