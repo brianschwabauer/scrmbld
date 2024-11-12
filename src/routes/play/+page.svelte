@@ -18,7 +18,7 @@
 	let inputEl = $state<HTMLInputElement | undefined>(undefined);
 	let answerEl = $state<HTMLDivElement | undefined>(undefined);
 	let shuffling = $state(false);
-	let scrambled = $state(shuffle());
+	let scrambled = $state(shuffle(false));
 	let attempt = $state('');
 	let selectionStart = $state(0);
 	let selectionEnd = $state(0);
@@ -92,8 +92,31 @@
 		}, 5000);
 	}
 
-	function shuffle() {
+	const audioEffects = browser
+		? [{ start: 0, end: 2.5, audio: new Audio(`${assets}/splitflap.mp3`) }]
+		: [];
+	audioEffects.forEach((effect) => effect.audio.load());
+	function playSoundEffect(effect: number) {
+		if (!audioEffects[effect]) return;
+		const audio = audioEffects[effect].audio;
+		const isPlaying =
+			audio.currentTime > 0 && !audio.paused && !audio.ended && audio.readyState > 2;
+		if (isPlaying) return;
+		audio.currentTime = audioEffects[effect].start;
+		audio.play();
+		const cb = () => {
+			if (audio.currentTime >= audioEffects[effect].end) {
+				audio.pause();
+				audio.removeEventListener('timeupdate', cb);
+			}
+		};
+		audio.addEventListener('timeupdate', cb);
+	}
+	$effect(() => playSoundEffect(0));
+
+	function shuffle(playSound = true) {
 		shuffling = true;
+		if (playSound) playSoundEffect(0);
 		setTimeout(() => {
 			shuffling = false;
 		}, 1500);
@@ -276,7 +299,7 @@
 		/>
 	</div>
 	<div class="question">
-		<FlipText word={scrambled} {usedLetters} />
+		<FlipText word={scrambled} {usedLetters} duration={350} />
 	</div>
 	<div class="answer" bind:this={answerEl}>
 		<FlipText
