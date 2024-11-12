@@ -256,6 +256,10 @@
 	});
 </script>
 
+<svelte:head>
+	<title>Play | SCRMBLD</title>
+</svelte:head>
+
 <svelte:window onkeyup={onWindowKeyUp} />
 
 {#if attempt === answer}

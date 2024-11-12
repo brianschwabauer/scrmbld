@@ -3,6 +3,10 @@
 	const { data } = $props();
 </script>
 
+<svelte:head>
+	<title>SCRMBLD</title>
+</svelte:head>
+
 <article>
 	<header>
 		<FlipText word="SCRMBLD" />
