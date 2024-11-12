@@ -24,8 +24,9 @@
 	let attempt = $state('');
 	let selectionStart = $state(0);
 	let selectionEnd = $state(0);
-	let success = $state(false);
 	let times = $state<number[][]>([]);
+	let hintLetters = $state(0);
+	const success = $derived(!!answer && attempt === answer);
 	const time = $derived(
 		times.reduce((total, [start, end]) => {
 			return total + Math.max(0, Math.round((end - start) / 1000));
@@ -130,13 +131,17 @@
 		return letters.join('').toUpperCase();
 	}
 
-	function removeExtraLetter() {
-		if (mixletters.length === 0) return;
-		mixletters.pop();
-		scrambled = shuffle();
+	function applyHint() {
+		if (mixletters.length) {
+			mixletters.pop();
+			scrambled = shuffle();
+			return;
+		}
+		if (hintLetters >= answer.length) return;
+		hintLetters++;
+		attempt = answer.slice(0, hintLetters) + attempt.slice(hintLetters);
 	}
 
-	let timer: ReturnType<typeof setTimeout> | undefined;
 	function onWindowKeyUp(e: KeyboardEvent) {
 		if (!inputEl) return;
 		if (e.target === inputEl || inputEl === document.activeElement) return;
@@ -148,14 +153,17 @@
 			return;
 		}
 		if (e.key === 'ArrowRight') {
-			selectionEnd = Math.min(selectionEnd + 1, 7);
+			selectionEnd = Math.min(selectionEnd + 1, 7, attempt.length - hintLetters);
 			selectionStart = Math.min(selectionEnd, 6);
 			inputEl.setSelectionRange(selectionStart, selectionEnd);
 			return;
 		}
 		if (e.key === 'Backspace') {
 			selectionStart = Math.max(Math.min(selectionStart, selectionEnd - 1), 0);
-			attempt = attempt.slice(0, selectionStart) + attempt.slice(selectionEnd);
+			attempt =
+				answer.slice(0, hintLetters) +
+				attempt.slice(hintLetters, hintLetters + selectionStart) +
+				attempt.slice(hintLetters + selectionEnd);
 			selectionStart++;
 			selectionEnd = selectionStart;
 			inputEl.setSelectionRange(selectionStart, selectionEnd);
@@ -163,7 +171,11 @@
 		}
 		if (!e.key.match(/^[A-Za-z]$/)) return;
 		const key = e.key.toUpperCase();
-		attempt = attempt.slice(0, selectionStart) + key + attempt.slice(selectionEnd);
+		attempt =
+			answer.slice(0, hintLetters) +
+			attempt.slice(hintLetters, hintLetters + selectionStart) +
+			key +
+			attempt.slice(hintLetters + selectionEnd);
 		selectionStart++;
 		selectionEnd = selectionStart;
 		inputEl.setSelectionRange(selectionStart, selectionEnd);
@@ -173,7 +185,6 @@
 		if (success) return;
 		if (answer && attempt === answer) {
 			if (times[times.length - 1]) times[times.length - 1][1] = Date.now();
-			success = true;
 			clearInterval(interval);
 			localStorage.setItem(
 				`scrmbld_${todaysWord.day}`,
@@ -210,10 +221,7 @@
 				const savedInfo = JSON.parse(localStorage.getItem(`scrmbld_${todaysWord.day}`) || '');
 				if (savedInfo) {
 					times = savedInfo.times;
-					success = savedInfo.success ?? false;
-					if (success) {
-						attempt = answer;
-					}
+					if (savedInfo.success) attempt = answer;
 				}
 			} catch (error) {
 				// ignore
@@ -292,19 +300,32 @@
 		<FlipText word={scrambled} {usedLetters} duration={350} />
 	</div>
 	<div class="answer" bind:this={answerEl}>
+		{#if hintLetters}
+			<FlipText
+				class="hint"
+				word={answer.slice(0, hintLetters)}
+				duration={100}
+				onlyAnimateOneLetter
+				success
+				error={attempt.length === answer.length && attempt !== answer}
+				minLength={hintLetters}
+			/>
+		{/if}
 		<FlipText
-			word={attempt}
+			word={attempt.slice(hintLetters)}
 			duration={100}
 			{selectionEnd}
 			{selectionStart}
 			onlyAnimateOneLetter
-			success={attempt === answer}
+			{success}
 			error={attempt.length === answer.length && attempt !== answer}
+			minLength={answer.length - hintLetters}
 		/>
 		<input
 			bind:this={inputEl}
 			type="text"
-			value={attempt}
+			style:--num-letters={answer.length - hintLetters}
+			value={attempt.slice(hintLetters)}
 			onkeyup={(e) => {
 				const target =e.target as HTMLInputElement;
 				selectionEnd = Math.min(target.selectionEnd as number, 7);
@@ -324,7 +345,7 @@
 				newValue = newValue.slice(0, 7);
 				selectionEnd = Math.min(selectionEnd - numberOfInvaidChars, 7);
 				selectionStart = Math.min(selectionStart - numberOfInvaidChars, selectionEnd, 6);
-				attempt = newValue;
+				attempt = answer.slice(0, hintLetters) + newValue;
 				if (newValue !== value) {
 					target.value = attempt;
 					target.setSelectionRange(selectionStart, selectionEnd);
@@ -343,6 +364,15 @@
 	</div>
 	<div class="actions">
 		{#if success}
+			<button
+				use:ripple
+				onclick={() => {
+					attempt = '';
+					times = [];
+					hintLetters = 0;
+					localStorage.removeItem(`scrmbld_${todaysWord.day}`);
+				}}>Reset</button
+			>
 			<button class="primary" onclick={openNativeShare} bind:this={shareButtonEl}>Share</button>
 			{#if !useNativeShare}
 				<Popover refElement={shareButtonEl} openOnClick>
@@ -389,8 +419,8 @@
 			<button disabled={shuffling} onclick={() => (scrambled = shuffle())} use:ripple
 				>Shuffle</button
 			>
-			{#if mixletters.length > 0}
-				<button onclick={() => removeExtraLetter()} use:ripple>Hint</button>
+			{#if attempt !== answer && time > (mixletters.length ? 60 : 120 + hintLetters * 60)}
+				<button onclick={() => applyHint()} use:ripple>Hint</button>
 			{/if}
 		{/if}
 	</div>
@@ -458,7 +488,11 @@
 		box-shadow: none;
 		border: none;
 		background-color: rgba(255, 255, 255, 0.05);
-		color: #eeeeee;
+		color: #dddddd;
+		font-family: 'Roboto Mono', monospace;
+		font-optical-sizing: auto;
+		font-weight: 400;
+		font-style: normal;
 		&:hover {
 			background-color: rgba(255, 255, 255, 0.1);
 		}
@@ -513,11 +547,14 @@
 		}
 		:global(.flip-text) {
 			grid-row: 1 / 1;
+			grid-column: 2 / 2;
+		}
+		:global(.flip-text.hint) {
 			grid-column: 1 / 1;
 		}
 		input {
 			grid-row: 1 / 1;
-			grid-column: 1 / 1;
+			grid-column: 2 / 2;
 			z-index: 2;
 			background-color: transparent;
 			border: none;
@@ -528,7 +565,7 @@
 			font-optical-sizing: auto;
 			font-weight: 500;
 			font-style: normal;
-			width: calc(0.8em * 7);
+			width: calc(0.8em * var(--num-letters));
 			padding: 0 0 0 0.1em;
 			margin: 0;
 			line-height: 1em;
