@@ -13,6 +13,7 @@
 		success = false,
 		error = false,
 		usedLetters = undefined as Set<number> | undefined,
+		class: className = '',
 		alphabet = [
 			'',
 			'@',
@@ -211,11 +212,15 @@
 	});
 </script>
 
-<div class="flip-text" bind:this={container} class:success class:error>
+<div
+	class={['flip-text', className].filter(Boolean).join(' ')}
+	bind:this={container}
+	class:success
+	class:error
+>
 	{#each new Array(Math.max(minLength, letters.length)) as _, i (i)}
 		<div
 			class="letters"
-			out:scale={{ easing: backIn, duration: 200 }}
 			class:used={usedLetters?.has(i)}
 			class:selected={Math.abs(selectionEnd - selectionStart) >= 1
 				? i >= selectionStart && i < selectionEnd
