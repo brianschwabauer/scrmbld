@@ -105,6 +105,10 @@
 		transition:
 			color 100ms ease,
 			background-color 100ms ease;
+		font-family: 'Roboto Mono', monospace;
+		font-optical-sizing: auto;
+		font-weight: 400;
+		font-style: normal;
 		&:hover {
 			background-color: rgba(255, 255, 255, 0.1);
 			color: #ffffff;
