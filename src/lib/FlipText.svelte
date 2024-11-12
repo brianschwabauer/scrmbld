@@ -12,7 +12,19 @@
 		onlyAnimateOneLetter = false,
 		success = false,
 		error = false,
-		usedLetters = undefined as Set<number> | undefined
+		usedLetters = undefined as Set<number> | undefined,
+		alphabet = [
+			'',
+			'@',
+			'#',
+			'+',
+			'=',
+			'?',
+			':',
+			...Array.from({ length: 10 }, (_, i) => String.fromCharCode(48 + i)),
+			...Array.from({ length: 26 }, (_, i) => String.fromCharCode(65 + i)),
+			' '
+		]
 	} = $props();
 	const DURATION = $derived(duration);
 	const STAGGER = $derived(Math.floor(duration * 0.2)); // number of ms between each letter animation
@@ -23,17 +35,6 @@
 		return split.concat(Array.from({ length: minLength - split.length }, () => ''));
 	});
 	let container = $state<HTMLDivElement | undefined>(undefined);
-	const allLetters = [
-		'',
-		'@',
-		'#',
-		'+',
-		'=',
-		'?',
-		':',
-		...Array.from({ length: 10 }, (_, i) => String.fromCharCode(48 + i)),
-		...Array.from({ length: 26 }, (_, i) => String.fromCharCode(65 + i))
-	];
 
 	function animateElement(
 		element: HTMLElement,
@@ -78,21 +79,21 @@
 				if (letter === prevLetters[i]) return;
 				const letterEl = container.children[i];
 				const allLettersEl = Array.from(letterEl.children) as HTMLElement[];
-				const letterIndex = Math.max(0, allLetters.indexOf(letter));
+				const letterIndex = Math.max(0, alphabet.indexOf(letter));
 				const prevLetter = prevLetters[i] || '';
-				const prevLetterIndex = Math.max(0, allLetters.indexOf(prevLetter));
+				const prevLetterIndex = Math.max(0, alphabet.indexOf(prevLetter));
 				if (prevLetterIndex === letterIndex) return;
-				const distance = (letterIndex - prevLetterIndex + allLetters.length) % allLetters.length;
+				const distance = (letterIndex - prevLetterIndex + alphabet.length) % alphabet.length;
 				allLettersEl.forEach((el, j) => {
 					const index = Math.floor(j / 2);
 					const distanceFromPrevLetterIndex =
-						(index - prevLetterIndex + allLetters.length) % allLetters.length;
+						(index - prevLetterIndex + alphabet.length) % alphabet.length;
 					const isBetweenPrevAndNext = distanceFromPrevLetterIndex < distance;
 					const isTop = el.classList.contains('top') && !el.classList.contains('blank');
 					const isBottom = el.classList.contains('bottom') && !el.classList.contains('blank');
 					const stagger = STAGGER - Math.max(1, distance / 20) * 10;
 					if (isTop) {
-						el.style.zIndex = `${allLetters.length - distanceFromPrevLetterIndex + 1}`;
+						el.style.zIndex = `${alphabet.length - distanceFromPrevLetterIndex + 1}`;
 						if (index === letterIndex) {
 							el.getAnimations().forEach((animation) => {
 								try {
@@ -152,7 +153,7 @@
 					}
 					if (isBottom) {
 						const distanceFromLetterIndex =
-							(index - letterIndex - 1 + allLetters.length) % allLetters.length;
+							(index - letterIndex - 1 + alphabet.length) % alphabet.length;
 						el.style.zIndex = `${distanceFromLetterIndex + 1}`;
 						if (index === prevLetterIndex) {
 							el.getAnimations().forEach((animation) => {
@@ -220,7 +221,7 @@
 				? i >= selectionStart && i < selectionEnd
 				: i >= selectionStart && i <= selectionEnd}
 		>
-			{#each allLetters as l (l)}
+			{#each alphabet as l (l)}
 				<div class="part top">{l}</div>
 				<div class="part bottom">
 					{l}
