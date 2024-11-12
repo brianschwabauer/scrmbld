@@ -250,7 +250,30 @@
 
 <article>
 	<div class="timer">
-		<FlipText word={timeDisplay} minLength={4} duration={200} />
+		<FlipText
+			word={timeDisplay}
+			minLength={4}
+			duration={200}
+			alphabet={[
+				'',
+				'@',
+				'#',
+				'+',
+				'=',
+				'?',
+				':',
+				'0',
+				'1',
+				'2',
+				'3',
+				'4',
+				'5',
+				'6',
+				'7',
+				'8',
+				'9'
+			]}
+		/>
 	</div>
 	<div class="question">
 		<FlipText word={scrambled} {usedLetters} />
@@ -412,6 +435,9 @@
 		}
 	}
 	.question {
+		display: flex;
+		flex-direction: column;
+		gap: 1rem;
 		font-size: 1rem;
 		margin-bottom: 1rem;
 		@media (min-width: 350px) {
