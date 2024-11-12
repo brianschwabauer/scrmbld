@@ -87,6 +87,7 @@
 		gap: var(--key-gap);
 	}
 	button.key {
+		-webkit-tap-highlight-color: transparent;
 		position: relative;
 		overflow: hidden;
 		display: flex;

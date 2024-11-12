@@ -5,6 +5,7 @@
 	import FlipText from '$lib/FlipText.svelte';
 	import Keyboard from '$lib/Keyboard.svelte';
 	import Popover from '$lib/Popover.svelte';
+	import { ripple } from '$lib/ripple';
 	import { tooltip } from '$lib/tootltip.js';
 	import { untrack } from 'svelte';
 	import { Confetti } from 'svelte-confetti';
@@ -352,6 +353,7 @@
 								onclick={shareToClipboard}
 								aria-label="Copy share text"
 								use:tooltip={'Copy score to clipboard'}
+								use:ripple
 							>
 								<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24"
 									><path
@@ -364,6 +366,7 @@
 								onclick={shareOnTwitter}
 								class="twitter"
 								use:tooltip={'Share score on Twitter/X'}
+								use:ripple
 							>
 								<img src="{assets}/x.svg" alt="Twitter Logo" />
 							</button>
@@ -371,6 +374,7 @@
 								onclick={shareOnFacebook}
 								class="facebook"
 								use:tooltip={'Share score on Facebook'}
+								use:ripple
 							>
 								<img src="{assets}/facebook.png" alt="Facebook Logo" />
 							</button>
@@ -382,9 +386,11 @@
 				</Popover>
 			{/if}
 		{:else}
-			<button disabled={shuffling} onclick={() => (scrambled = shuffle())}>Shuffle</button>
+			<button disabled={shuffling} onclick={() => (scrambled = shuffle())} use:ripple
+				>Shuffle</button
+			>
 			{#if mixletters.length > 0}
-				<button onclick={() => removeExtraLetter()}>Hint</button>
+				<button onclick={() => removeExtraLetter()} use:ripple>Hint</button>
 			{/if}
 		{/if}
 	</div>
@@ -439,6 +445,8 @@
 		margin-bottom: 4rem;
 	}
 	button {
+		-webkit-tap-highlight-color: transparent;
+		position: relative;
 		cursor: pointer;
 		font-size: 1.5rem;
 		text-decoration: none;
