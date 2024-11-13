@@ -52,13 +52,18 @@
 		return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 	});
 	const usedLetters = $derived.by(() => {
-		const letters = new Set<number>();
-		attempt.split('').forEach((letter) => {
-			let index = scrambled.indexOf(letter);
-			if (letters.has(index)) index = scrambled.indexOf(letter, index + 1);
-			if (index > -1) letters.add(index);
+		const letterIndexes = new Set<number>();
+		attempt.split('').forEach((letter, i) => {
+			let index: number | undefined;
+			while (index === undefined || index > -1) {
+				index = scrambled.indexOf(letter, (index || -1) + 1);
+				if (index > -1 && !letterIndexes.has(index)) {
+					letterIndexes.add(index);
+					break;
+				}
+			}
 		});
-		return letters;
+		return letterIndexes;
 	});
 	const shareURL = `https://scrmbld.app`;
 	const shareText = $derived(`🅂🄲🅁🄼🄱🄻🄳 ⏲${timeDisplay}`);
@@ -307,7 +312,6 @@
 				duration={100}
 				onlyAnimateOneLetter
 				success
-				error={attempt.length === answer.length && attempt !== answer}
 				minLength={hintLetters}
 			/>
 		{/if}
@@ -318,7 +322,7 @@
 			{selectionStart}
 			onlyAnimateOneLetter
 			{success}
-			error={attempt.length === answer.length && attempt !== answer}
+			error={attempt.length === answer.length && !success}
 			minLength={answer.length - hintLetters}
 		/>
 		<input
