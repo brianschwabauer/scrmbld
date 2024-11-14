@@ -55,8 +55,8 @@
 		const letterIndexes = new Set<number>();
 		attempt.split('').forEach((letter, i) => {
 			let index: number | undefined;
-			while (index === undefined || index > -1) {
-				index = scrambled.indexOf(letter, (index || -1) + 1);
+			while (index === undefined || index > -1 || index >= scrambled.length - 1) {
+				index = scrambled.indexOf(letter, (index ?? -1) + 1);
 				if (index > -1 && !letterIndexes.has(index)) {
 					letterIndexes.add(index);
 					break;
