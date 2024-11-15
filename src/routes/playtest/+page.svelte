@@ -194,7 +194,7 @@
 			duration: 500,
 			css: (t, u) => {
 				return `
-					width: calc(var(--size) * ${t});
+					width: calc(var(--width) * ${t});
 					opacity: ${t};
 				`;
 			}
@@ -445,7 +445,7 @@
 			<button onclick={() => applyHint()} use:ripple class="hint" disabled={!hintEnabled}>
 				{#if !hintEnabled && browser && time}
 					<div class="hint-progress" transition:hintProgressTransition>
-						<svg viewBox="0 0 100 100" style:--progress={((time % 60) / 60) * 100}>
+						<svg viewBox="0 0 100 100" style:--progress={((Math.max(0, time - 1) % 60) / 60) * 100}>
 							<circle class="bg"></circle>
 							<circle class="fg"></circle>
 						</svg>
@@ -507,12 +507,13 @@
 		align-items: center;
 	}
 	.hint-progress {
-		--width: 1.5rem;
+		--width: 1.15em;
 		--stroke-width: 15px;
 		width: var(--width);
 		height: var(--width);
 		position: relative;
 		margin: 0 0.5rem 0 -0.5rem;
+		transition: width 200ms ease;
 		svg {
 			position: absolute;
 			top: 0;
@@ -543,7 +544,7 @@
 			transform: rotate(-90deg);
 			transform-origin: var(--half-size) var(--half-size);
 			stroke-dasharray: var(--dash) calc(var(--circumference) - var(--dash));
-			transition: stroke-dasharray 0.3s linear 0s;
+			transition: stroke-dasharray 1s linear 0s;
 			stroke: rgba(255, 255, 255, 0.9);
 		}
 
