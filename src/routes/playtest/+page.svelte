@@ -247,24 +247,26 @@
 				// ignore
 			}
 		}
-		if (!times.length) {
-			const now = Date.now();
-			times.push([now, now]);
-		}
 		untrack(() => {
-			interval = setInterval(() => {
-				if (success || !times.length) return;
-				const now = Date.now();
-				if (times[times.length - 1][1] < now - 3000) {
+			setTimeout(() => {
+				if (!times.length) {
+					const now = Date.now();
 					times.push([now, now]);
-				} else {
-					times[times.length - 1][1] = now;
 				}
-				localStorage.setItem(
-					`scrmbld_${todaysWord.day}`,
-					JSON.stringify({ ...todaysWord, times, success })
-				);
-			}, 1000);
+				interval = setInterval(() => {
+					if (success || !times.length) return;
+					const now = Date.now();
+					if (times[times.length - 1][1] < now - 3000) {
+						times.push([now, now]);
+					} else {
+						times[times.length - 1][1] = now;
+					}
+					localStorage.setItem(
+						`scrmbld_${todaysWord.day}`,
+						JSON.stringify({ ...todaysWord, times, success })
+					);
+				}, 1000);
+			}, 1500);
 		});
 		return () => clearInterval(interval);
 	});
