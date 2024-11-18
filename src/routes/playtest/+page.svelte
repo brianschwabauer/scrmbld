@@ -594,11 +594,23 @@
 			}
 		}
 	}
+	.timer {
+		font-size: 0.7rem;
+		@media (min-width: 350px) {
+			font-size: 0.8rem;
+		}
+		@media (min-width: 400px) {
+			font-size: 0.85rem;
+		}
+		@media (min-width: 600px) {
+			font-size: 1rem;
+		}
+	}
 	.question {
 		display: flex;
 		flex-direction: column;
 		gap: 1rem;
-		font-size: 1rem;
+		font-size: 0.9rem;
 		@media (min-width: 350px) {
 			font-size: 1.35rem;
 		}
@@ -609,10 +621,10 @@
 			font-size: 2rem;
 			margin-bottom: 2rem;
 		}
-		@media (min-width: 1200px) {
+		@media (min-width: 1200px) and (min-height: 700px) {
 			font-size: 3rem;
 		}
-		@media (min-width: 1600px) {
+		@media (min-width: 1600px) and (min-height: 800px) {
 			font-size: 3.5rem;
 		}
 	}
@@ -620,10 +632,13 @@
 		display: grid;
 		grid-template-columns: 1fr;
 		grid-template-rows: 1fr;
-		font-size: 1rem;
+		font-size: 1.25rem;
 		margin-bottom: 1rem;
+		@media (min-width: 300px) {
+			font-size: 1.5rem;
+		}
 		@media (min-width: 350px) {
-			font-size: 2rem;
+			font-size: 1.75rem;
 		}
 		@media (min-width: 400px) {
 			font-size: 2rem;
@@ -631,10 +646,10 @@
 		@media (min-width: 600px) {
 			font-size: 3rem;
 		}
-		@media (min-width: 1200px) {
+		@media (min-width: 1200px) and (min-height: 700px) {
 			font-size: 4rem;
 		}
-		@media (min-width: 1600px) {
+		@media (min-width: 1600px) and (min-height: 800px) {
 			font-size: 4.5rem;
 		}
 		:global(.flip-text) {
