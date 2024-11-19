@@ -1,6 +1,6 @@
 # SCRMBLD
 
-A simple daily word game of finding the the 7 letter word form 10 scrambled letters.
+A simple daily word game of finding the the 7 letter word from 8 scrambled letters.
 
 ## To run locally
 
