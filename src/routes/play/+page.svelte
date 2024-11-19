@@ -9,6 +9,8 @@
 	import { tooltip } from '$lib/tootltip.js';
 	import { untrack } from 'svelte';
 	import { Confetti } from 'svelte-confetti';
+	import { quartInOut } from 'svelte/easing';
+	import { type TransitionConfig } from 'svelte/transition';
 
 	const { data } = $props();
 	const words = $derived(data.words);
@@ -186,6 +188,19 @@
 		inputEl.setSelectionRange(selectionStart, selectionEnd);
 	}
 
+	function hintProgressTransition(node: HTMLElement): TransitionConfig {
+		return {
+			easing: quartInOut,
+			duration: 500,
+			css: (t, u) => {
+				return `
+					width: calc(var(--width) * ${t});
+					opacity: ${t};
+				`;
+			}
+		};
+	}
+
 	$effect(() => {
 		if (success) return;
 		if (answer && attempt === answer) {
@@ -232,24 +247,26 @@
 				// ignore
 			}
 		}
-		if (!times.length) {
-			const now = Date.now();
-			times.push([now, now]);
-		}
 		untrack(() => {
-			interval = setInterval(() => {
-				if (success || !times.length) return;
-				const now = Date.now();
-				if (times[times.length - 1][1] < now - 3000) {
+			setTimeout(() => {
+				if (!times.length) {
+					const now = Date.now();
 					times.push([now, now]);
-				} else {
-					times[times.length - 1][1] = now;
 				}
-				localStorage.setItem(
-					`scrmbld_${todaysWord.day}`,
-					JSON.stringify({ ...todaysWord, times, success })
-				);
-			}, 1000);
+				interval = setInterval(() => {
+					if (success || !times.length) return;
+					const now = Date.now();
+					if (times[times.length - 1][1] < now - 3000) {
+						times.push([now, now]);
+					} else {
+						times[times.length - 1][1] = now;
+					}
+					localStorage.setItem(
+						`scrmbld_${todaysWord.day}`,
+						JSON.stringify({ ...todaysWord, times, success })
+					);
+				}, 1000);
+			}, 1500);
 		});
 		return () => clearInterval(interval);
 	});
@@ -275,35 +292,6 @@
 {/if}
 
 <article>
-	<div class="timer">
-		<FlipText
-			word={timeDisplay}
-			minLength={4}
-			duration={200}
-			alphabet={[
-				'',
-				'@',
-				'#',
-				'+',
-				'=',
-				'?',
-				':',
-				'0',
-				'1',
-				'2',
-				'3',
-				'4',
-				'5',
-				'6',
-				'7',
-				'8',
-				'9'
-			]}
-		/>
-	</div>
-	<div class="question">
-		<FlipText word={scrambled} {usedLetters} duration={350} />
-	</div>
 	<div class="answer" bind:this={answerEl}>
 		{#if hintLetters}
 			<FlipText
@@ -366,6 +354,9 @@
 			}}
 		/>
 	</div>
+	<div class="question">
+		<FlipText word={scrambled} {usedLetters} duration={350} />
+	</div>
 	<div class="actions">
 		{#if success}
 			<button
@@ -377,6 +368,38 @@
 					localStorage.removeItem(`scrmbld_${todaysWord.day}`);
 				}}>Reset</button
 			>
+		{:else}
+			<button disabled={shuffling} onclick={() => (scrambled = shuffle())} use:ripple
+				>Shuffle</button
+			>
+		{/if}
+		<div class="timer">
+			<FlipText
+				word={timeDisplay}
+				minLength={4}
+				duration={200}
+				alphabet={[
+					'',
+					'@',
+					'#',
+					'+',
+					'=',
+					'?',
+					':',
+					'0',
+					'1',
+					'2',
+					'3',
+					'4',
+					'5',
+					'6',
+					'7',
+					'8',
+					'9'
+				]}
+			/>
+		</div>
+		{#if success}
 			<button class="primary" onclick={openNativeShare} bind:this={shareButtonEl}>Share</button>
 			{#if !useNativeShare}
 				<Popover refElement={shareButtonEl} openOnClick>
@@ -420,12 +443,18 @@
 				</Popover>
 			{/if}
 		{:else}
-			<button disabled={shuffling} onclick={() => (scrambled = shuffle())} use:ripple
-				>Shuffle</button
-			>
-			{#if attempt !== answer && time > (mixletters.length ? 60 : 120 + hintLetters * 60)}
-				<button onclick={() => applyHint()} use:ripple>Hint</button>
-			{/if}
+			{@const hintEnabled = time > (mixletters.length ? 60 : 120 + hintLetters * 60)}
+			<button onclick={() => applyHint()} use:ripple class="hint" disabled={!hintEnabled}>
+				{#if !hintEnabled && browser && time}
+					<div class="hint-progress" transition:hintProgressTransition>
+						<svg viewBox="0 0 100 100" style:--progress={((Math.max(0, time - 1) % 60) / 60) * 100}>
+							<circle class="bg"></circle>
+							<circle class="fg"></circle>
+						</svg>
+					</div>
+				{/if}
+				Hint
+			</button>
 		{/if}
 	</div>
 	<Keyboard
@@ -442,9 +471,6 @@
 </article>
 
 <style lang="scss">
-	.timer {
-		margin-bottom: 1rem;
-	}
 	.confetti {
 		position: fixed;
 		bottom: 0;
@@ -478,14 +504,66 @@
 		margin-top: 2rem;
 		margin-bottom: 4rem;
 	}
+	.hint {
+		display: flex;
+		align-items: center;
+	}
+	.hint-progress {
+		--width: 1.15em;
+		--stroke-width: 15px;
+		width: var(--width);
+		height: var(--width);
+		position: relative;
+		margin: 0 0.5rem 0 -0.5rem;
+		transition: width 200ms ease;
+		svg {
+			position: absolute;
+			top: 0;
+			left: 0;
+			width: var(--width);
+			height: var(--width);
+			--size: 100px;
+			--half-size: calc(var(--size) / 2);
+			--radius: calc((var(--size) - var(--stroke-width)) / 2);
+			--circumference: calc(var(--radius) * pi * 2);
+			--dash: calc((var(--progress) * (var(--circumference) - var(--stroke-width))) / 100);
+		}
+
+		svg circle {
+			cx: var(--half-size);
+			cy: var(--half-size);
+			r: var(--radius);
+			stroke-width: var(--stroke-width);
+			fill: none;
+			stroke-linecap: round;
+		}
+
+		svg circle.bg {
+			stroke: rgba(255, 255, 255, 0.2);
+		}
+
+		svg circle.fg {
+			transform: rotate(-90deg);
+			transform-origin: var(--half-size) var(--half-size);
+			stroke-dasharray: var(--dash) calc(var(--circumference) - var(--dash));
+			transition: stroke-dasharray 1s linear 0s;
+			stroke: rgba(255, 255, 255, 0.9);
+		}
+
+		@property --progress {
+			syntax: '<number>';
+			inherits: false;
+			initial-value: 0;
+		}
+	}
 	button {
 		-webkit-tap-highlight-color: transparent;
 		position: relative;
 		cursor: pointer;
-		font-size: 1.5rem;
+		font-size: 1rem;
 		text-decoration: none;
 		border-radius: 999px;
-		padding: 0.5rem 1.5rem;
+		padding: 0.5em 1em;
 		margin: 0;
 		font-weight: 500;
 		outline: none;
@@ -497,7 +575,14 @@
 		font-optical-sizing: auto;
 		font-weight: 400;
 		font-style: normal;
-		&:hover {
+		@media (min-width: 600px) {
+			font-size: 1.5rem;
+		}
+		&:disabled {
+			opacity: 0.65;
+			cursor: not-allowed;
+		}
+		&:hover:not(:disabled) {
 			background-color: rgba(255, 255, 255, 0.1);
 		}
 		&.primary {
@@ -509,12 +594,23 @@
 			}
 		}
 	}
+	.timer {
+		font-size: 0.7rem;
+		@media (min-width: 350px) {
+			font-size: 0.8rem;
+		}
+		@media (min-width: 400px) {
+			font-size: 0.85rem;
+		}
+		@media (min-width: 600px) {
+			font-size: 1rem;
+		}
+	}
 	.question {
 		display: flex;
 		flex-direction: column;
 		gap: 1rem;
-		font-size: 1rem;
-		margin-bottom: 1rem;
+		font-size: 0.9rem;
 		@media (min-width: 350px) {
 			font-size: 1.35rem;
 		}
@@ -525,10 +621,10 @@
 			font-size: 2rem;
 			margin-bottom: 2rem;
 		}
-		@media (min-width: 1200px) {
+		@media (min-width: 1200px) and (min-height: 700px) {
 			font-size: 3rem;
 		}
-		@media (min-width: 1600px) {
+		@media (min-width: 1600px) and (min-height: 800px) {
 			font-size: 3.5rem;
 		}
 	}
@@ -536,18 +632,25 @@
 		display: grid;
 		grid-template-columns: 1fr;
 		grid-template-rows: 1fr;
-		font-size: 1rem;
+		font-size: 1.25rem;
+		margin-bottom: 1rem;
+		@media (min-width: 300px) {
+			font-size: 1.5rem;
+		}
 		@media (min-width: 350px) {
-			font-size: 2rem;
+			font-size: 1.75rem;
 		}
 		@media (min-width: 400px) {
 			font-size: 2rem;
 		}
-		@media (min-width: 1200px) {
+		@media (min-width: 600px) {
 			font-size: 3rem;
 		}
-		@media (min-width: 1600px) {
-			font-size: 3.5rem;
+		@media (min-width: 1200px) and (min-height: 700px) {
+			font-size: 4rem;
+		}
+		@media (min-width: 1600px) and (min-height: 800px) {
+			font-size: 4.5rem;
 		}
 		:global(.flip-text) {
 			grid-row: 1 / 1;
