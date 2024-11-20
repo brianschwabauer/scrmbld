@@ -105,15 +105,27 @@
 							});
 							el.style.opacity = '1';
 							el.style.transform = 'rotate3d(1, 0, 0, 0deg)';
+							el.style.filter = 'none';
 						} else if (onlyAnimateOneLetter && index === prevLetterIndex) {
 							previousAnimations.push(
 								animateElement(
 									el,
 									[
-										{ transform: 'rotate3d(1, 0, 0, 0deg)', opacity: 1, offset: 0 },
-										{ transform: 'rotate3d(1, 0, 0, -90deg)', opacity: 1, offset: 0.99 },
+										{
+											transform: 'rotate3d(1, 0, 0, 0deg)',
+											opacity: 1,
+											offset: 0,
+											filter: 'brightness(1)'
+										},
 										{
 											transform: 'rotate3d(1, 0, 0, -90deg)',
+											opacity: 1,
+											offset: 0.99,
+											filter: 'brightness(.5)'
+										},
+										{
+											transform: 'rotate3d(1, 0, 0, -90deg)',
+											filter: 'brightness(1)',
 											opacity: 0,
 											offset: 1
 										}
@@ -132,19 +144,18 @@
 										{
 											transform: 'rotate3d(1, 0, 0, 0deg)',
 											opacity: 1,
-											offset: 0
-											// color: '#dddddd',
-											// backgroundImage: `linear-gradient(170deg, #414141 0%, #303030 50%)`
+											offset: 0,
+											filter: 'brightness(1)'
 										},
 										{
 											transform: 'rotate3d(1, 0, 0, -90deg)',
 											opacity: 1,
 											offset: 0.99,
-											color: '#666666',
-											backgroundImage: `linear-gradient(170deg, #323232 0%, #282828 50%)`
+											filter: 'brightness(.5)'
 										},
 										{
 											transform: 'rotate3d(1, 0, 0, -90deg)',
+											filter: 'brightness(1)',
 											opacity: 0,
 											offset: 1
 										}
@@ -157,10 +168,14 @@
 							);
 						} else {
 							previousAnimations.push(
-								animateElement(el, [{ transform: 'rotate3d(1, 0, 0, 90deg)', opacity: 0 }], {
-									duration: DURATION,
-									delay: distanceFromPrevLetterIndex * stagger
-								})
+								animateElement(
+									el,
+									[{ transform: 'rotate3d(1, 0, 0, 90deg)', opacity: 0, filter: 'brightness(1)' }],
+									{
+										duration: DURATION,
+										delay: distanceFromPrevLetterIndex * stagger
+									}
+								)
 							);
 						}
 					}
