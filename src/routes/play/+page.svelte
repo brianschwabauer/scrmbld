@@ -146,7 +146,7 @@
 		}
 		if (hintLetters >= answer.length) return;
 		hintLetters++;
-		attempt = answer.slice(0, hintLetters) + attempt.slice(hintLetters);
+		attempt = (answer.slice(0, hintLetters) + attempt.slice(hintLetters)).slice(0, 7);
 	}
 
 	function onWindowKeyUp(e: KeyboardEvent) {
@@ -167,23 +167,25 @@
 		}
 		if (e.key === 'Backspace') {
 			selectionStart = Math.max(Math.min(selectionStart, selectionEnd - 1), 0);
-			attempt =
+			attempt = (
 				answer.slice(0, hintLetters) +
 				attempt.slice(hintLetters, hintLetters + selectionStart) +
-				attempt.slice(hintLetters + selectionEnd);
-			selectionStart++;
+				attempt.slice(hintLetters + selectionEnd)
+			).slice(0, 7);
+			if (selectionStart < 6) selectionStart++;
 			selectionEnd = selectionStart;
 			inputEl.setSelectionRange(selectionStart, selectionEnd);
 			return;
 		}
 		if (!e.key.match(/^[A-Za-z]$/)) return;
 		const key = e.key.toUpperCase();
-		attempt =
+		attempt = (
 			answer.slice(0, hintLetters) +
 			attempt.slice(hintLetters, hintLetters + selectionStart) +
 			key +
-			attempt.slice(hintLetters + selectionEnd);
-		selectionStart++;
+			attempt.slice(hintLetters + selectionEnd)
+		).slice(0, 7);
+		if (selectionStart < 6) selectionStart++;
 		selectionEnd = selectionStart;
 		inputEl.setSelectionRange(selectionStart, selectionEnd);
 	}
@@ -337,7 +339,7 @@
 				newValue = newValue.slice(0, 7);
 				selectionEnd = Math.min(selectionEnd - numberOfInvaidChars, 7);
 				selectionStart = Math.min(selectionStart - numberOfInvaidChars, selectionEnd, 6);
-				attempt = answer.slice(0, hintLetters) + newValue;
+				attempt = (answer.slice(0, hintLetters) + newValue).slice(0, 7);
 				if (newValue !== value) {
 					target.value = attempt;
 					target.setSelectionRange(selectionStart, selectionEnd);
