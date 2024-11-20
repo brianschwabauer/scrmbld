@@ -28,6 +28,7 @@
 	let selectionEnd = $state(0);
 	let times = $state<number[][]>([]);
 	let hintLetters = $state(0);
+	let wasKeyboardInput = $state(false);
 	const success = $derived(!!answer && attempt === answer);
 	const time = $derived(
 		times.reduce((total, [start, end]) => {
@@ -153,6 +154,8 @@
 		if (!inputEl) return;
 		if (e.target === inputEl || inputEl === document.activeElement) return;
 		if (e.ctrlKey || e.metaKey || e.altKey) return;
+		if (!e.detail && !wasKeyboardInput) wasKeyboardInput = true;
+		if (e.detail && wasKeyboardInput) wasKeyboardInput = false;
 		if (e.key === 'ArrowLeft') {
 			selectionStart = Math.max(selectionStart - 1, 0);
 			selectionEnd = Math.max(selectionStart, 1);
@@ -299,18 +302,18 @@
 			<FlipText
 				class="hint"
 				word={answer.slice(0, hintLetters)}
-				duration={100}
-				onlyAnimateOneLetter
+				duration={wasKeyboardInput ? 100 : 150}
+				onlyAnimateOneLetter={wasKeyboardInput}
 				success
 				minLength={hintLetters}
 			/>
 		{/if}
 		<FlipText
 			word={attempt.slice(hintLetters)}
-			duration={100}
+			duration={wasKeyboardInput ? 100 : 150}
 			{selectionEnd}
 			{selectionStart}
-			onlyAnimateOneLetter
+			onlyAnimateOneLetter={wasKeyboardInput}
 			{success}
 			error={attempt.length === answer.length && !success}
 			minLength={answer.length - hintLetters}
@@ -467,7 +470,7 @@
 				selectionEnd = 0;
 				return;
 			}
-			window.dispatchEvent(new KeyboardEvent('keyup', { key }));
+			window.dispatchEvent(new KeyboardEvent('keyup', { key, detail: 1 }));
 		}}
 	></Keyboard>
 </article>
