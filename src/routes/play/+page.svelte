@@ -633,7 +633,7 @@
 		grid-template-columns: 1fr;
 		grid-template-rows: 1fr;
 		font-size: 1.25rem;
-		margin-bottom: 1rem;
+		margin-bottom: 1.5rem;
 		@media (min-width: 300px) {
 			font-size: 1.5rem;
 		}
@@ -660,8 +660,9 @@
 			grid-column: 1 / 1;
 		}
 		input {
-			grid-row: 1 / 1;
-			grid-column: 2 / 2;
+			position: absolute;
+			// grid-row: 1 / 1;
+			// grid-column: 2 / 2;
 			z-index: 2;
 			background-color: transparent;
 			border: none;
@@ -673,10 +674,10 @@
 			font-weight: 500;
 			font-style: normal;
 			width: calc(0.8em * var(--num-letters));
-			padding: 0 0 0 0.1em;
+			padding: 0 0 0 0.075em;
 			margin: 0;
 			line-height: 1em;
-			letter-spacing: 0.22em;
+			letter-spacing: 0.2em;
 			text-align: left;
 			opacity: 0;
 		}

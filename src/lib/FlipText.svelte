@@ -129,8 +129,20 @@
 								animateElement(
 									el,
 									[
-										{ transform: 'rotate3d(1, 0, 0, 0deg)', opacity: 1, offset: 0 },
-										{ transform: 'rotate3d(1, 0, 0, -90deg)', opacity: 1, offset: 0.99 },
+										{
+											transform: 'rotate3d(1, 0, 0, 0deg)',
+											opacity: 1,
+											offset: 0
+											// color: '#dddddd',
+											// backgroundImage: `linear-gradient(170deg, #414141 0%, #303030 50%)`
+										},
+										{
+											transform: 'rotate3d(1, 0, 0, -90deg)',
+											opacity: 1,
+											offset: 0.99,
+											color: '#666666',
+											backgroundImage: `linear-gradient(170deg, #323232 0%, #282828 50%)`
+										},
 										{
 											transform: 'rotate3d(1, 0, 0, -90deg)',
 											opacity: 0,
@@ -251,6 +263,17 @@
 		gap: max(2px, 0.1em);
 		justify-content: center;
 		z-index: 1;
+		&::before {
+			content: '';
+			position: absolute;
+			top: -0.12em;
+			left: -0.12em;
+			right: -0.12em;
+			bottom: -0.12em;
+			box-shadow: inset 1px 1px 0.08em 1px black;
+			border-radius: 0.08em;
+			background-color: #282828;
+		}
 		&.success {
 			.letters {
 				color: #00b7a1;
@@ -279,14 +302,30 @@
 			display: grid;
 			grid-template-columns: 1fr;
 			grid-template-rows: 1fr;
-			perspective: 150px;
+			perspective: 200px;
 			user-select: none;
 			color: #dddddd;
+			position: relative;
+			--gap: max(2px, 0.045em);
+			box-shadow:
+				1px 1px 1px 0px rgba(0, 0, 0, 0.8),
+				2px 2px 4px 0px rgba(0, 0, 0, 0.25);
+			border-radius: 0.05em;
+			&::after {
+				content: '';
+				position: absolute;
+				top: calc(50% - var(--gap) / 2);
+				left: -0.12em;
+				right: -0.12em;
+				height: var(--gap);
+				background-color: #222222;
+				z-index: 100;
+			}
 			&.used {
 				color: #666666;
 			}
 			&.selected {
-				outline: solid 2px #aaaaaa;
+				outline: solid 0.03em #aaaaaa;
 				color: #ffffff;
 			}
 			.part,
@@ -294,7 +333,7 @@
 				grid-column: 1 / 1;
 				grid-row: 1 / 1;
 				font-size: 2em;
-				width: 0.8em;
+				width: 0.75em;
 				height: 1em;
 				padding: 0 0 0.05em;
 				display: flex;
@@ -304,14 +343,16 @@
 				backface-visibility: hidden;
 				transform-origin: center center;
 				will-change: transform, opacity;
-				--gap: max(2px, 0.045em);
+				border-radius: 2px;
 				&.top {
 					--clip: calc(50% - var(--gap) / 2);
 					clip-path: polygon(0 0, 100% 0, 100% var(--clip), 0 var(--clip));
+					background-image: linear-gradient(170deg, #414141 0%, #303030 50%);
 				}
 				&.bottom {
 					--clip: calc(50% + var(--gap) / 2);
 					clip-path: polygon(0 var(--clip), 100% var(--clip), 100% 100%, 0 100%);
+					background-image: linear-gradient(170deg, #383838 50%, #272727 100%);
 				}
 			}
 			.part {
