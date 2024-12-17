@@ -1,15 +1,12 @@
-import WORDLIST from '../../../static/wordlist.json';
+import { getDailyWord } from '$lib/server/daily-word.server';
 
 export function load() {
-	const firstDay = WORDLIST.firstDay;
-	const list = WORDLIST.list;
-	const today = new Date().setUTCHours(0, 0, 0, 0);
-	const daysSinceStart = Math.max(0, Math.floor((today - firstDay) / 86400000));
+	const { today, tomorrow, yesterday } = getDailyWord();
 	return {
 		words: [
-			{ day: today - 86400000, word: list[(daysSinceStart - 1 + list.length) % list.length] },
-			{ day: today, word: list[daysSinceStart % list.length] },
-			{ day: today + 86400000, word: list[(daysSinceStart + 1) % list.length] }
+			{ day: yesterday.day, word: [yesterday.word, ...yesterday.extraLetters] },
+			{ day: today.day, word: [today.word, ...today.extraLetters] },
+			{ day: tomorrow.day, word: [tomorrow.word, ...tomorrow.extraLetters] }
 		]
 	};
 }
