@@ -437,11 +437,17 @@
 					times = [];
 					hintLetters = 0;
 					localStorage.removeItem(`scrmbld_${todaysWord.day}`);
+					if (inputEl) inputEl.focus();
 				}}>Reset</button
 			>
 		{:else}
-			<button disabled={shuffling} onclick={() => (scrambled = shuffle())} use:ripple
-				>Shuffle</button
+			<button
+				disabled={shuffling}
+				onclick={() => {
+					scrambled = shuffle();
+					if (inputEl) inputEl.focus();
+				}}
+				use:ripple>Shuffle</button
 			>
 		{/if}
 		<div class="timer">
@@ -515,7 +521,15 @@
 			{/if}
 		{:else}
 			{@const hintEnabled = time > (mixletters.length ? 60 : 120 + hintLetters * 60)}
-			<button onclick={() => applyHint()} use:ripple class="hint" disabled={!hintEnabled}>
+			<button
+				onclick={() => {
+					applyHint();
+					if (inputEl) inputEl.focus();
+				}}
+				use:ripple
+				class="hint"
+				disabled={!hintEnabled}
+			>
 				{#if !hintEnabled && browser && time}
 					<div class="hint-progress" transition:hintProgressTransition>
 						<svg viewBox="0 0 100 100" style:--progress={((Math.max(0, time - 1) % 60) / 60) * 100}>
