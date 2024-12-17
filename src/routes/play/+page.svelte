@@ -29,6 +29,9 @@
 	let times = $state<number[][]>([]);
 	let hintLetters = $state(0);
 	let wasKeyboardInput = $state(false);
+	let gameplayID = $state<string | undefined>(undefined);
+	let gameplayStartSaved = $state(false);
+	let gameplayEndSaved = $state(false);
 	const success = $derived(!!answer && attempt === answer);
 	const time = $derived(
 		times.reduce((total, [start, end]) => {
@@ -222,7 +225,14 @@
 			clearInterval(interval);
 			localStorage.setItem(
 				`scrmbld_${todaysWord.day}`,
-				JSON.stringify({ ...todaysWord, times, success })
+				JSON.stringify({
+					...todaysWord,
+					times,
+					success,
+					gameplayID,
+					gameplayStartSaved,
+					gameplayEndSaved
+				})
 			);
 		}
 	});
@@ -255,7 +265,13 @@
 				const savedInfo = JSON.parse(localStorage.getItem(`scrmbld_${todaysWord.day}`) || '');
 				if (savedInfo) {
 					times = savedInfo.times;
+					gameplayID = savedInfo.gameplayID;
+					gameplayStartSaved = savedInfo.gameplayStartSaved || false;
+					gameplayEndSaved = savedInfo.gameplayEndSaved || false;
 					if (savedInfo.success) attempt = answer;
+					untrack(() => {
+						if (!gameplayStartSaved) saveGameplayStart();
+					});
 				}
 			} catch (error) {
 				// ignore
@@ -277,12 +293,57 @@
 					}
 					localStorage.setItem(
 						`scrmbld_${todaysWord.day}`,
-						JSON.stringify({ ...todaysWord, times, success })
+						JSON.stringify({
+							...todaysWord,
+							times,
+							success,
+							gameplayID,
+							gameplayStartSaved,
+							gameplayEndSaved
+						})
 					);
 				}, 1000);
 			}, 1500);
 		});
 		return () => clearInterval(interval);
+	});
+
+	// Log the gameplay start
+	async function saveGameplayStart() {
+		const response = await fetch('/api/gameplay', {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json'
+			},
+			body: JSON.stringify({
+				word: todaysWord.word[0],
+				day: todaysWord.day
+			})
+		});
+		if (response.ok) {
+			const { uuid } = await response.json<any>();
+			gameplayID = uuid;
+			gameplayStartSaved = true;
+		}
+	}
+
+	// Log the gameplay end when the user succeeds
+	async function saveGameplayEnd() {
+		if (!gameplayID) return;
+		const response = await fetch(`/api/gameplay/${gameplayID}/finish`, {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json'
+			},
+			body: JSON.stringify({ times })
+		});
+		if (response.ok) gameplayEndSaved = true;
+	}
+
+	$effect(() => {
+		if (gameplayEndSaved || !gameplayStartSaved || !gameplayID) return;
+		if (!success) return;
+		saveGameplayEnd();
 	});
 </script>
 
@@ -329,7 +390,7 @@
 			style:--num-letters={answer.length - hintLetters}
 			value={attempt.slice(hintLetters)}
 			onkeyup={(e) => {
-				const target =e.target as HTMLInputElement;
+				const target = e.target as HTMLInputElement;
 				selectionEnd = Math.min(target.selectionEnd as number, 7);
 				selectionStart = Math.min(target.selectionStart as number, selectionEnd, 6);
 				if (selectionStart === selectionEnd && selectionStart === 0) {
@@ -338,7 +399,7 @@
 				}
 			}}
 			oninput={(e) => {
-				const target =e.target as HTMLInputElement;
+				const target = e.target as HTMLInputElement;
 				selectionStart = target.selectionStart as number;
 				selectionEnd = target.selectionEnd as number;
 				const value = target.value;
@@ -354,7 +415,7 @@
 				}
 			}}
 			onselectionchange={(e) => {
-				const target =e.target as HTMLInputElement;
+				const target = e.target as HTMLInputElement;
 				selectionEnd = Math.min(target.selectionEnd as number, 7);
 				selectionStart = Math.min(target.selectionStart as number, selectionEnd, 6);
 				if (selectionStart === selectionEnd && selectionStart === 0) {
