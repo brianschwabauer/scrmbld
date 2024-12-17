@@ -1,6 +1,11 @@
 import { randomNumberGenerator } from '$lib';
 import ALL_WORDS from './../../../../static/allwords.txt?raw';
 import WORDLIST from './../../../../static/wordlist.txt?raw';
+import PREVIOUS_WORDLIST from './../../../../static/wordlist.json';
+
+// The canonical start day where the first word from the list will be used
+// If the list runs out of words, it will start over from the beginning
+const FIRST_DAY = 1734393600000;
 
 const aToZ = [
 	'a',
@@ -58,6 +63,7 @@ const frequency = {
 	j: 0.1,
 	z: 0.07
 };
+const daysSinceStart = Math.max(0, Math.floor((Date.now() - FIRST_DAY) / 86400000));
 
 export function GET({ url }) {
 	const WORD_LENGTH = 7;
@@ -68,6 +74,20 @@ export function GET({ url }) {
 	const words = WORDLIST.split('\n')
 		.map((word) => word.toLowerCase().trim())
 		.filter((word) => word && word.match(/^[a-z]+$/) && word.length === WORD_LENGTH);
+
+	// Check if any words were removed from the wordlist
+	// If they have been removed, they should be kept in the list,
+	// if they would mess up the canonical order by being removed
+	const removedWords = PREVIOUS_WORDLIST.list.filter(([word]) => !words.includes(word));
+	removedWords.forEach(([word]) => words.push(word));
+	words.sort();
+
+	// Get the list of words that have been added since the last wordlist was generated
+	// These words should be added to the end of the list so they don't mess up the canonical order
+	const addedWords = words.filter(
+		(word) => !PREVIOUS_WORDLIST.list.some(([previousWord]) => previousWord === word)
+	);
+
 	const allWordHashes = ALL_WORDS.split('\n')
 		.map((word) => word.toLowerCase().trim())
 		.filter((word) => word && word.match(/^[a-z]+$/) && word.length === WORD_LENGTH)
@@ -157,8 +177,43 @@ export function GET({ url }) {
 		}
 		return [word, ...additionalLetters];
 	});
+
+	// First sort the list so that newly added words are at the end
+	// This is necessary to keep the canonical order of the wordlist
+	list.sort((a, b) => {
+		const aIsOriginal = +PREVIOUS_WORDLIST.list.some(([word]) => word === a[0]);
+		const bIsOriginal = +PREVIOUS_WORDLIST.list.some(([word]) => word === b[0]);
+		return bIsOriginal - aIsOriginal;
+	});
+
+	// Sort the items that haven't been recently added in a deterministic random way
+	const randomizeList = randomNumberGenerator();
+	const sortPosition = list.length - addedWords.length;
+	for (let i = sortPosition - 1; i >= 0; i--) {
+		const j = Math.floor(randomizeList.next().value * (i + 1));
+		[list[i], list[j]] = [list[j], list[i]];
+	}
+
+	// Sort the rest of the items (that are safely past the canonical first day)
+	for (let i = list.length - 1; i >= daysSinceStart; i--) {
+		const j = Math.floor(randomizeList.next().value * (i + 1 - daysSinceStart) + daysSinceStart);
+		[list[i], list[j]] = [list[j], list[i]];
+	}
+
+	// Remove the words that were removed from the wordlist and don't effect the canonical order
+	removedWords.forEach(([removedWord]) => {
+		const removeIndex = list.findIndex(([word]) => word === removedWord);
+		if (removeIndex > -1) {
+			const originalIndex = PREVIOUS_WORDLIST.list.findIndex(([word]) => word === removedWord);
+			if (originalIndex > daysSinceStart) list.splice(removeIndex, 1);
+		}
+	});
+
 	return new Response(
-		JSON.stringify(list.filter((letters) => letters.length === numExtraLetters + 1)),
+		JSON.stringify({
+			firstDay: FIRST_DAY,
+			list: list.filter((letters) => letters.length === numExtraLetters + 1)
+		}),
 		{
 			headers: {
 				'content-type': 'application/json; charset=UTF-8'
