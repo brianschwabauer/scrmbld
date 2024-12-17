@@ -41,9 +41,9 @@ export async function POST({ request, platform, params }) {
 	const result = await d1
 		.prepare(
 			`UPDATE gameplay
-			SET ended_at = ?
-			SET json = ?
-			SET time = ?
+			SET ended_at = ?,
+				json = ?,
+				time = ?
 			WHERE uuid = ?`
 		)
 		.bind(now, JSON.stringify({ times }), time, uuid)
