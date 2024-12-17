@@ -206,6 +206,15 @@
 		};
 	}
 
+	// Focus the input element to open up the keyboard on mobile
+	$effect(() => {
+		if (!inputEl) return;
+		setTimeout(() => {
+			if (!inputEl) return;
+			inputEl.focus();
+		}, 2500);
+	});
+
 	$effect(() => {
 		if (success) return;
 		if (answer && attempt === answer) {
