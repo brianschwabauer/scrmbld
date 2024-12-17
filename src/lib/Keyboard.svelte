@@ -65,14 +65,17 @@
 
 <style lang="scss">
 	.keyboard {
-		--key-width: 32px;
+		--key-width: min(32px, calc(100vw / 10));
 		--key-height: 45px;
-		--key-gap: 8px;
+		--key-gap: min(8px, 1vw);
 		display: flex;
 		flex-direction: column;
 		gap: var(--key-gap);
 		max-width: min(calc(100vw - 1rem), 600px);
-		font-size: 1.1rem;
+		font-size: 1rem;
+		@media (min-width: 400px) {
+			font-size: 1.1rem;
+		}
 		@media (min-width: 600px) {
 			--key-width: 45px;
 			--key-height: 60px;
