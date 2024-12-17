@@ -33,6 +33,7 @@
 	"dependencies": {
 		"@floating-ui/core": "^1.6.8",
 		"@floating-ui/dom": "^1.6.12",
-		"svelte-confetti": "^2.0.0"
+		"svelte-confetti": "^2.0.0",
+		"ua-parser-js": "^2.0.0"
 	}
 }
