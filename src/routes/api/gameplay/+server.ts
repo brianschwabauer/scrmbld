@@ -7,7 +7,11 @@ export async function POST({ cookies, request, getClientAddress, platform }) {
 	const d1 = platform?.env?.D1;
 	if (!d1) throw error(500, 'Database not available');
 	const uuid = crypto.randomUUID();
-	const user_uuid = cookies.get('scrmbld_user_uuid') || crypto.randomUUID();
+	let user_uuid = cookies.get('scrmbld_user_uuid');
+	if (!user_uuid) {
+		user_uuid = crypto.randomUUID();
+		cookies.set('scrmbld_user_uuid', user_uuid, { path: '/' });
+	}
 	const ua = request.headers.get('User-Agent') || undefined;
 	const ip = getClientAddress() || undefined;
 	let parsedUA: any;
