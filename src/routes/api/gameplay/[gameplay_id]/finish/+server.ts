@@ -46,7 +46,7 @@ export async function POST({ request, platform, params }) {
 			SET time = ?
 			WHERE uuid = ?`
 		)
-		.bind([now, JSON.stringify({ times }), time, uuid])
+		.bind(now, JSON.stringify({ times }), time, uuid)
 		.run();
 	if (result.success) {
 		console.log(`Ran query successfully`, result);
