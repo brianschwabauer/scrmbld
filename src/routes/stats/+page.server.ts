@@ -2,7 +2,18 @@ import type { GamePlay } from '../api/gameplay/gameplay.type';
 
 export async function load({ platform }) {
 	const d1 = platform?.env?.D1;
-	if (!d1) return { stats: [] };
+	if (!d1)
+		return {
+			stats: [
+				{
+					day: new Date().setUTCHours(0, 0, 0, 0),
+					word: 'placeholder',
+					average: 60000,
+					numAttempts: 100,
+					numCorrect: 50
+				}
+			]
+		};
 	console.log(
 		`Querying for gameplay records from ${new Date().setUTCHours(0, 0, 0, 0) - 86400000 * 7}`
 	);
