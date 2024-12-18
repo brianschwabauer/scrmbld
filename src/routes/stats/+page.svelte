@@ -1,10 +1,16 @@
 <script lang="ts">
+	import { assets } from '$app/paths';
+
 	let { data } = $props();
 	const stats = $derived(data.stats);
 </script>
 
+<svelte:head>
+	<meta name="robots" content="noindex" />
+</svelte:head>
+
 <article>
-	<h1>SCRMBLD Stats</h1>
+	<img src="{assets}/scrmbld-logo-web.png" alt="Scrmbld Logo" />
 	<ul>
 		{#each stats as stat}
 			<li>
@@ -44,6 +50,11 @@
 		max-width: 600px;
 		text-align: left;
 		margin: 0 auto;
+	}
+	img {
+		display: block;
+		margin: 1rem auto 2rem;
+		max-width: min(100%, 400px);
 	}
 	h1 {
 		font-size: 2rem;
