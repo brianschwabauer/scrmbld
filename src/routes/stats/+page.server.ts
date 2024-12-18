@@ -22,6 +22,7 @@ export async function load({ platform }) {
 		const info = gameplays.get(game.day) || { word: game.word, numAttempts: 0, times: [] };
 		info.numAttempts++;
 		if (game.time) info.times.push(game.time);
+		gameplays.set(game.day, info);
 	});
 	const stats = Array.from(gameplays.entries())
 		.map(([day, { word, numAttempts, times }]) => ({
