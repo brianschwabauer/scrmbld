@@ -25,19 +25,9 @@
 					<p>{Intl.NumberFormat().format(stat.numAttempts)} attempts</p>
 					<p>{Intl.NumberFormat().format(stat.numCorrect)} correct</p>
 					<p>
-						{#if stat.average >= 1000 * 100}
-							{Intl.NumberFormat(undefined, {
-								maximumFractionDigits: 2,
-								unit: 'minute',
-								unitDisplay: 'short'
-							}).format(stat.average / 1000 / 60)}m average
-						{:else}
-							{Intl.NumberFormat(undefined, {
-								maximumFractionDigits: 1,
-								unit: 'second',
-								unitDisplay: 'short'
-							}).format(stat.average / 1000)}s average
-						{/if}
+						{Math.floor(
+							stat.average / 60000
+						)}:{`${Math.floor((stat.average / 1000) % 60)}`.padStart(2, '0')} average
 					</p>
 				</div>
 			</li>
