@@ -9,16 +9,29 @@
 		{#each stats as stat}
 			<li>
 				<h2>{stat.word}</h2>
-				<h3>{new Date(stat.day).toLocaleDateString(undefined, { dateStyle: 'medium' })}</h3>
+				<h3>
+					{new Date(stat.day).toLocaleDateString(undefined, {
+						timeZone: 'UTC',
+						dateStyle: 'medium'
+					})}
+				</h3>
 				<div class="stats">
 					<p>{Intl.NumberFormat().format(stat.numAttempts)} attempts</p>
 					<p>{Intl.NumberFormat().format(stat.numCorrect)} correct</p>
 					<p>
-						{Intl.NumberFormat(undefined, {
-							maximumFractionDigits: 1,
-							unit: 'second',
-							unitDisplay: 'short'
-						}).format(stat.average / 1000)}s average
+						{#if stat.average >= 1000 * 100}
+							{Intl.NumberFormat(undefined, {
+								maximumFractionDigits: 2,
+								unit: 'minute',
+								unitDisplay: 'short'
+							}).format(stat.average / 1000 / 60)}m average
+						{:else}
+							{Intl.NumberFormat(undefined, {
+								maximumFractionDigits: 1,
+								unit: 'second',
+								unitDisplay: 'short'
+							}).format(stat.average / 1000)}s average
+						{/if}
 					</p>
 				</div>
 			</li>
