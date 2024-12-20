@@ -1,3 +1,4 @@
+<!-- svelte-ignore state_referenced_locally -->
 <script lang="ts">
 	import { browser } from '$app/environment';
 	import { assets } from '$app/paths';
