@@ -269,15 +269,13 @@
 					gameplayStartSaved = savedInfo.gameplayStartSaved || false;
 					gameplayEndSaved = savedInfo.gameplayEndSaved || false;
 					if (savedInfo.success) attempt = answer;
-					untrack(() => {
-						if (!gameplayStartSaved) saveGameplayStart();
-					});
 				}
 			} catch (error) {
 				// ignore
 			}
 		}
 		untrack(() => {
+			if (!gameplayStartSaved) saveGameplayStart();
 			setTimeout(() => {
 				if (!times.length) {
 					const now = Date.now();
