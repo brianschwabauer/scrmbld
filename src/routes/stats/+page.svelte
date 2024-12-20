@@ -22,12 +22,12 @@
 					})}
 				</h3>
 				<div class="stats">
-					<p>{Intl.NumberFormat().format(stat.numAttempts)} attempts</p>
-					<p>{Intl.NumberFormat().format(stat.numCorrect)} correct</p>
+					<p>{Intl.NumberFormat().format(stat.numAttempts || 0)} attempts</p>
+					<p>{Intl.NumberFormat().format(stat.numCorrect || 0)} correct</p>
 					<p>
 						{Math.floor(
-							stat.average / 60000
-						)}:{`${Math.floor((stat.average / 1000) % 60)}`.padStart(2, '0')} average
+							(stat.average || 0) / 60000
+						)}:{`${Math.floor(((stat.average || 0) / 1000) % 60)}`.padStart(2, '0')} average
 					</p>
 				</div>
 			</li>
@@ -45,9 +45,6 @@
 		display: block;
 		margin: 1rem auto 2rem;
 		max-width: min(100%, 400px);
-	}
-	h1 {
-		font-size: 2rem;
 	}
 	h2 {
 		margin: 0;
