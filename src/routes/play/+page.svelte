@@ -19,7 +19,7 @@
 	const todaysWord = $derived(words.findLast(({ day }) => today >= day) || words[0]);
 	const answer = $derived(todaysWord.word[0].toUpperCase());
 	const random = randomNumberGenerator();
-	let mixletters = $state(todaysWord.word.slice(1, 2));
+	let mixletters = $state(todaysWord.word.slice(1));
 	let inputEl = $state<HTMLInputElement | undefined>(undefined);
 	let answerEl = $state<HTMLDivElement | undefined>(undefined);
 	let shuffling = $state(false);
@@ -72,8 +72,13 @@
 		});
 		return letterIndexes;
 	});
+	const numHintsUsed = $derived(
+		Math.max(0, Math.min(7, todaysWord.word.slice(1).length - mixletters.length + hintLetters))
+	);
 	const shareURL = `https://scrmbld.app`;
-	const shareText = $derived(`🅂🄲🅁🄼🄱🄻🄳 ⏲${timeDisplay}`);
+	const shareText = $derived(
+		`🆂🅲🆁🅼🅱🅻🅳`.slice(0, numHintsUsed * 2) + `🅂🄲🅁🄼🄱🄻🄳`.slice(numHintsUsed * 2) + ` ⏲${timeDisplay}`
+	);
 
 	function openNativeShare() {
 		if (!useNativeShare || typeof navigator === 'undefined' || !navigator.share) return;
