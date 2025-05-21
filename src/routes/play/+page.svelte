@@ -12,9 +12,11 @@
 	import { Confetti } from 'svelte-confetti';
 	import { quartInOut } from 'svelte/easing';
 	import { type TransitionConfig } from 'svelte/transition';
+	import TimeComparisonGraphic from '$lib/TimeComparisonGraphic.svelte';
 
 	const { data } = $props();
 	const words = $derived(data.words);
+	const averageTime = $derived(data.averageTime);
 	const today = $derived(new Date().setHours(0, 0, 0, 0));
 	const todaysWord = $derived(words.findLast(({ day }) => today >= day) || words[0]);
 	const answer = $derived(todaysWord.word[0].toUpperCase());
@@ -39,6 +41,7 @@
 			return total + Math.max(0, Math.round((end - start) / 1000));
 		}, 0)
 	); // number of seconds since the start of the game
+	const playerTimeForGraphic = $derived(time * 1000); // Convert to milliseconds for the graphic
 	let didCopyToClipboard = $state(false);
 	let shareButtonEl = $state<HTMLButtonElement | undefined>(undefined);
 	const useNativeShare = $derived(
@@ -364,6 +367,7 @@
 			iterationCount={1}
 		/>
 	</div>
+	<TimeComparisonGraphic playerTime={playerTimeForGraphic} {averageTime} />
 {/if}
 
 <article>
