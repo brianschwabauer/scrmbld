@@ -13,6 +13,7 @@
 	import { quartInOut } from 'svelte/easing';
 	import { type TransitionConfig } from 'svelte/transition';
 	import TimeComparisonGraphic from '$lib/TimeComparisonGraphic.svelte';
+	import Modal from '$lib/Modal.svelte';
 
 	const { data } = $props();
 	const words = $derived(data.words);
@@ -42,6 +43,7 @@
 		}, 0)
 	); // number of seconds since the start of the game
 	const playerTimeForGraphic = $derived(time * 1000); // Convert to milliseconds for the graphic
+	let showResultsModal = $state(false);
 	let didCopyToClipboard = $state(false);
 	let shareButtonEl = $state<HTMLButtonElement | undefined>(undefined);
 	const useNativeShare = $derived(
@@ -228,8 +230,8 @@
 	});
 
 	$effect(() => {
-		if (success) return;
-		if (answer && attempt === answer) {
+		if (success) {
+			showResultsModal = true;
 			if (times[times.length - 1]) times[times.length - 1][1] = Date.now();
 			clearInterval(interval);
 			localStorage.setItem(
@@ -367,7 +369,7 @@
 			iterationCount={1}
 		/>
 	</div>
-	<TimeComparisonGraphic playerTime={playerTimeForGraphic} {averageTime} />
+	<!-- TimeComparisonGraphic removed from here -->
 {/if}
 
 <article>
@@ -444,6 +446,7 @@
 					attempt = '';
 					times = [];
 					hintLetters = 0;
+					showResultsModal = false; // Hide modal on reset
 					localStorage.removeItem(`scrmbld_${todaysWord.day}`);
 					if (inputEl) inputEl.focus();
 				}}>Reset</button
@@ -562,6 +565,10 @@
 		}}
 	></Keyboard>
 </article>
+
+<Modal {showResultsModal}>
+	<TimeComparisonGraphic playerTime={playerTimeForGraphic} {averageTime} />
+</Modal>
 
 <style lang="scss">
 	.confetti {

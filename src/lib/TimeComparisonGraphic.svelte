@@ -11,12 +11,9 @@
   const formattedAverageTime = formatTime(averageTime);
 </script>
 
-<div>
-  {#if formattedPlayerTime}
-    <p>Your Time: {formattedPlayerTime}s</p>
-  {/if}
-  
-  {#if averageTime && averageTime > 0 && formattedAverageTime}
+<div class="graphic-container">
+  <p>Your Time: {formattedPlayerTime}s</p>
+  {#if formattedAverageTime && averageTime && averageTime > 0}
     <p>Average Time: {formattedAverageTime}s</p>
   {:else}
     <p>Average time is not available yet.</p>
@@ -24,16 +21,13 @@
 </div>
 
 <style>
-  div {
-    padding: 1em;
-    border: 1px solid #ccc;
-    border-radius: 5px;
+  .graphic-container {
     text-align: center;
-    font-family: sans-serif;
-    margin-top: 1rem;
+    /* Removed padding, border, border-radius, font-family, margin-top */
   }
   p {
-    margin: 0.5em 0;
-    font-size: 1.1em;
+    margin: 0.6em 0; /* Slightly adjusted margin for better spacing */
+    font-size: 1.1rem; /* Increased font size */
+    color: #f0f0f0; /* Ensuring good contrast on dark modal */
   }
 </style>
