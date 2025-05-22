@@ -37,6 +37,7 @@
 	});
 	let container = $state<HTMLDivElement | undefined>(undefined);
 
+	// eslint-disable-next-line no-undef
 	function animateElement(
 		element: HTMLElement,
 		keyframes: Keyframe[],
@@ -75,6 +76,7 @@
 				}
 			});
 			previousAnimations = [];
+
 			letters.forEach((letter, i) => {
 				if (!container?.children?.[i]) return;
 				if (letter === prevLetters[i]) return;

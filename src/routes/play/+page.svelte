@@ -1,4 +1,3 @@
-<!-- svelte-ignore state_referenced_locally -->
 <script lang="ts">
 	import { browser } from '$app/environment';
 	import { assets } from '$app/paths';
@@ -19,7 +18,7 @@
 	const todaysWord = $derived(words.findLast(({ day }) => today >= day) || words[0]);
 	const answer = $derived(todaysWord.word[0].toUpperCase());
 	const random = randomNumberGenerator();
-	let mixletters = $state(todaysWord.word.slice(1));
+	const mixletters = $derived(todaysWord.word.slice(1));
 	let inputEl = $state<HTMLInputElement | undefined>(undefined);
 	let answerEl = $state<HTMLDivElement | undefined>(undefined);
 	let shuffling = $state(false);
@@ -43,7 +42,7 @@
 	let shareButtonEl = $state<HTMLButtonElement | undefined>(undefined);
 	const useNativeShare = $derived(
 		browser &&
-			typeof navigator !== undefined &&
+			typeof navigator !== 'undefined' &&
 			'share' in navigator &&
 			!navigator.userAgent.includes('Windows')
 	);

@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { assets } from '$app/paths';
 
-	let { data } = $props();
+	const { data } = $props();
 	const stats = $derived(data.stats);
 </script>
 
@@ -12,7 +12,7 @@
 <article>
 	<img src="{assets}/scrmbld-logo-web.png" alt="Scrmbld Logo" />
 	<ul>
-		{#each stats as stat}
+		{#each stats as stat (stat.word)}
 			<li>
 				<h2>{stat.word}</h2>
 				<h3>

@@ -49,7 +49,7 @@
 		class: className = '',
 
 		/** The css style string added to the component from the parent */
-		style = '',
+		style = ''
 	} = $props();
 
 	const ARROW_SIZE = 20;
@@ -142,7 +142,7 @@
 			flip,
 			offset,
 			arrow: arrowMiddleware,
-			shift,
+			shift
 		} = await import('@floating-ui/dom');
 		popoverPositionDestroy();
 		popoverPositionDestroy = autoUpdate(refElement, popoverElement!, async () => {
@@ -151,7 +151,7 @@
 				placement: calculatedPlacement,
 				x,
 				y,
-				middlewareData,
+				middlewareData
 			} = await computePosition(refElement, popoverElement, {
 				placement,
 				strategy,
@@ -159,10 +159,8 @@
 					offset({ mainAxis: arrow ? OFFSET_WITH_ARROW : OFFSET }),
 					flip({ crossAxis: false }),
 					shift(),
-					...(!arrow
-						? []
-						: [arrowMiddleware({ element: arrowElement!, padding: ARROW_PADDING })]),
-				],
+					...(!arrow ? [] : [arrowMiddleware({ element: arrowElement!, padding: ARROW_PADDING })])
+				]
 			});
 			if (openOnHover && untrack(() => !forcedOpened)) {
 				if (borderRadius === undefined) {
@@ -171,20 +169,15 @@
 				if (!bounds || calculatedPlacement !== untrack(() => realPlacement)) {
 					bounds = refElement.getBoundingClientRect();
 				}
-				if (
-					calculatedPlacement.startsWith('top') ||
-					calculatedPlacement.startsWith('bottom')
-				) {
-					hitBoxLengthZ =
-						Math.min(16, bounds.height / 2) + (arrow ? OFFSET_WITH_ARROW : OFFSET);
+				if (calculatedPlacement.startsWith('top') || calculatedPlacement.startsWith('bottom')) {
+					hitBoxLengthZ = Math.min(16, bounds.height / 2) + (arrow ? OFFSET_WITH_ARROW : OFFSET);
 					hitBoxLength = popoverElement.clientWidth;
 					hitBoxLengthA = popoverElement.clientWidth - borderRadius * 2;
 					hitBoxLengthB = bounds.width;
 					hitBoxOffsetA = borderRadius;
 					hitBoxOffsetB = bounds.x - x;
 				} else {
-					hitBoxLengthZ =
-						Math.min(16, bounds.width / 2) + (arrow ? OFFSET_WITH_ARROW : OFFSET);
+					hitBoxLengthZ = Math.min(16, bounds.width / 2) + (arrow ? OFFSET_WITH_ARROW : OFFSET);
 					hitBoxLength = popoverElement.clientHeight;
 					hitBoxLengthA = popoverElement.clientHeight - borderRadius * 2;
 					hitBoxLengthB = bounds.height;
@@ -314,7 +307,7 @@
 
 	/** Handles when the user clicks on the popover's target/trigger element. Used to force open the popover */
 	function onRefElementClick(e: MouseEvent) {
-		let el = e.target as HTMLElement | null | undefined;
+		const el = e.target as HTMLElement | null | undefined;
 
 		// Check if the hit box shape was clicked. If so, we need to check if the click would have hit the trigger element
 		if (el && el.classList.contains('popover-hit-shape')) {
@@ -444,7 +437,7 @@
 			() => refElement?.removeEventListener('click', onRefElementClick),
 			() => refElement?.removeEventListener('pointerup', onRefElementPointerUp),
 			() => refElement?.removeEventListener('focus', onRefElementFocus),
-			() => refElement?.removeEventListener('keyup', onRefElementKeyUp),
+			() => refElement?.removeEventListener('keyup', onRefElementKeyUp)
 		);
 		return () => stopListeners();
 	});
@@ -473,10 +466,11 @@
 					}
 					element = element.parentElement as HTMLElement;
 				}
-				if(isButtonLike && opened) opened = false;
+				if (isButtonLike && opened) opened = false;
 			}}
 			in:scale={{ start: 0.7, easing: backOut, duration: TRANSITION_IN_DURATION }}
-			out:scale={{ start: 0.7, easing: backIn, duration: TRANSITION_OUT_DURATION }}>
+			out:scale={{ start: 0.7, easing: backIn, duration: TRANSITION_OUT_DURATION }}
+		>
 			{#if children}{@render children()}{/if}
 			{#if arrow}
 				<div
@@ -488,8 +482,8 @@
 					bind:this={arrowElement}
 					style:--arrow-size={`${ARROW_SIZE}px`}
 					style:left={arrowX}
-					style:top={arrowY}>
-				</div>
+					style:top={arrowY}
+				></div>
 			{/if}
 			{#if openOnHover && !forcedOpened}
 				<svg
@@ -517,13 +511,15 @@
 						: realPlacement.startsWith('right')
 							? ''
 							: '0px'}
-					style:right={realPlacement.startsWith('right') ? '100%' : ''}>
+					style:right={realPlacement.startsWith('right') ? '100%' : ''}
+				>
 					<path
 						class="popover-hit-shape"
 						onclick={onRefElementClick}
 						role="presentation"
 						d={hitBoxShape}
-						fill="transparent">
+						fill="transparent"
+					>
 					</path>
 				</svg>
 			{/if}
@@ -553,7 +549,7 @@
 			0 2px 5px -5px hsl(var(--shadow-hls) / calc(var(--shadow-strength) + 4%)),
 			0 4px 12px -5px hsl(var(--shadow-hls) / calc(var(--shadow-strength) + 5%)),
 			0 12px 15px -5px hsl(var(--shadow-hls) / calc(var(--shadow-strength) + 7%));
-		
+
 		z-index: var(--layer);
 		background-color: var(--bg);
 		border-radius: var(--radius);

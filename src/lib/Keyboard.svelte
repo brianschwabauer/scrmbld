@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { ripple } from './ripple';
 
-	let { onclick = (() => {}) as (key: string) => void } = $props();
+	const { onclick = (() => {}) as (key: string) => void } = $props();
 </script>
 
 <div class="keyboard">
