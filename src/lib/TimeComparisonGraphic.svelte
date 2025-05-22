@@ -1,6 +1,5 @@
 <script lang="ts">
-  export let playerTime: number;
-  export let averageTime: number | null;
+  const { playerTime, averageTime }: { playerTime: number; averageTime: number | null } = $props();
 
   // Logic to format times
   const formatTime = (timeMs: number | null | undefined): string | null => {
