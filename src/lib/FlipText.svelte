@@ -9,7 +9,6 @@
 		duration = 300,
 		selectionStart = -1 as number,
 		selectionEnd = -1 as number,
-		onlyAnimateOneLetter = false,
 		success = false,
 		error = false,
 		usedLetters = undefined as Set<number> | undefined,
@@ -106,7 +105,7 @@
 							el.style.opacity = '1';
 							el.style.transform = 'rotate3d(1, 0, 0, 0deg)';
 							el.style.filter = 'none';
-						} else if (onlyAnimateOneLetter && index === prevLetterIndex) {
+						} else if (index === prevLetterIndex) { // onlyAnimateOneLetter is true by default
 							previousAnimations.push(
 								animateElement(
 									el,
@@ -132,48 +131,19 @@
 									],
 									{
 										duration: DURATION,
-										delay: 0
+										delay: 0 // No stagger delay for single letter animation
 									}
 								)
 							);
-						} else if (!onlyAnimateOneLetter && isBetweenPrevAndNext) {
-							previousAnimations.push(
-								animateElement(
-									el,
-									[
-										{
-											transform: 'rotate3d(1, 0, 0, 0deg)',
-											opacity: 1,
-											offset: 0,
-											filter: 'brightness(1)'
-										},
-										{
-											transform: 'rotate3d(1, 0, 0, -90deg)',
-											opacity: 1,
-											offset: 0.99,
-											filter: 'brightness(.5)'
-										},
-										{
-											transform: 'rotate3d(1, 0, 0, -90deg)',
-											filter: 'brightness(1)',
-											opacity: 0,
-											offset: 1
-										}
-									],
-									{
-										duration: DURATION,
-										delay: distanceFromPrevLetterIndex * stagger
-									}
-								)
-							);
-						} else {
+						} else { // Hide other letters
 							previousAnimations.push(
 								animateElement(
 									el,
 									[{ transform: 'rotate3d(1, 0, 0, 90deg)', opacity: 0, filter: 'brightness(1)' }],
 									{
 										duration: DURATION,
-										delay: distanceFromPrevLetterIndex * stagger
+										// delay: distanceFromPrevLetterIndex * stagger // No stagger
+										delay: 0
 									}
 								)
 							);
@@ -193,7 +163,7 @@
 							});
 							el.style.opacity = `1`;
 							el.style.transform = `rotate3d(1, 0, 0, 0deg)`;
-						} else if (onlyAnimateOneLetter && index === letterIndex) {
+						} else if (index === letterIndex) { // onlyAnimateOneLetter is true by default
 							el.style.opacity = `0`;
 							el.style.transform = `rotate3d(1, 0, 0, 90deg)`;
 							previousAnimations.push(
@@ -205,29 +175,12 @@
 									],
 									{
 										duration: SPRING_DURATION,
-										delay: DURATION,
+										delay: DURATION, // Standard delay for the new letter's bottom part
 										easing: SPRING_EASING
 									}
 								)
 							);
-						} else if (!onlyAnimateOneLetter && distanceFromPrevLetterIndex <= distance) {
-							el.style.opacity = `0`;
-							el.style.transform = `rotate3d(1, 0, 0, 90deg)`;
-							previousAnimations.push(
-								animateElement(
-									el,
-									[
-										{ transform: 'rotate3d(1, 0, 0, 90deg)', opacity: 1 },
-										{ transform: 'rotate3d(1, 0, 0, 0deg)', opacity: 1 }
-									],
-									{
-										duration: SPRING_DURATION,
-										delay: distanceFromPrevLetterIndex * stagger + DURATION,
-										easing: SPRING_EASING
-									}
-								)
-							);
-						} else {
+						} else { // Hide other letters
 							el.style.opacity = `0`;
 							el.style.transform = `rotate3d(1, 0, 0, 90deg)`;
 						}
