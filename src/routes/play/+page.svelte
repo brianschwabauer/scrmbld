@@ -230,7 +230,9 @@
 	});
 
 	$effect(() => {
-		if (success) {
+		console.log(`Effect for success check: attempt='${attempt}', answer='${answer}', success=${success}, showResultsModal=${showResultsModal}`);
+		if (attempt === answer && !!answer) {
+			console.log('Condition met (attempt === answer && !!answer)! Setting showResultsModal = true.');
 			showResultsModal = true;
 			if (times[times.length - 1]) times[times.length - 1][1] = Date.now();
 			clearInterval(interval);
@@ -443,6 +445,7 @@
 			<button
 				use:ripple
 				onclick={() => {
+					console.log('Reset button clicked. Current showResultsModal:', showResultsModal);
 					attempt = '';
 					times = [];
 					hintLetters = 0;
