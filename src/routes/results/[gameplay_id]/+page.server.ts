@@ -13,50 +13,40 @@ export const load: PageServerLoad = async ({ platform, params, cookies }) => {
 	if (!gameplay?.time) {
 		throw error(404, { message: 'Gameplay results not found' });
 	}
-	const [
-		{ avg_time: averageForDay },
-		{ avg_time: userWeeklyAverage },
-		{ fastest_valid_time: fastestTime },
-	] = await Promise.all([
-		D1.prepare(`SELECT AVG(time) as avg_time FROM gameplay WHERE day = ? AND time IS NOT NULL`)
+	const [todaysResultsQuery, { avg_time: userWeeklyAverage }] = await Promise.all([
+		D1.prepare(
+			`SELECT * FROM gameplay WHERE day = ? AND time IS NOT NULL AND time >= 15000 AND time <= 600000 ORDER BY ended_at DESC LIMIT 200`,
+		)
 			.bind(gameplay.day)
-			.first<{ avg_time: number }>()
-			.then((res) => res || { avg_time: null }),
+			.all<GamePlay>(),
 		D1.prepare(
 			`SELECT AVG(time) as avg_time FROM gameplay WHERE user_uuid = ? AND day <= ? AND day >= ? AND time IS NOT NULL`,
 		)
 			.bind(gameplay.user_uuid, gameplay.day, gameplay.day - 7 * 86400000) // 7 days in milliseconds
 			.first<{ avg_time: number }>()
 			.then((res) => res || { avg_time: null }),
-		// D1.prepare(`SELECT MIN(time) as fastest_valid_time FROM gameplay WHERE day = ? AND time IS NOT NULL`)
-		// 	.bind(gameplay.day)
-		// 	.first<{ fastest_valid_time: number }>()
-		// 	.then((res) => res || { fastest_valid_time: null }),
-		D1.prepare(
-			` WITH Stats AS (
-					SELECT
-						AVG(time) AS avg_time,
-						-- Calculate standard deviation: SQRT(AVG(X^2) - (AVG(X))^2)
-						SQRT(AVG(time * time) - AVG(time) * AVG(time)) AS std_dev
-					FROM
-						gameplay
-					WHERE
-						day = ? AND time IS NOT NULL AND time > 0
-				)
-				SELECT
-					MIN(g.time) AS fastest_valid_time
-				FROM
-					gameplay AS g,
-					Stats AS s
-				WHERE
-					g.time IS NOT NULL
-					-- Filter out times more than 2 standard deviations below the average
-					AND g.time >= s.avg_time - (2 * s.std_dev);`,
-		)
-			.bind(gameplay.day)
-			.first<{ fastest_valid_time: number }>()
-			.then((res) => res || { fastest_valid_time: null }),
 	]);
+	if (!todaysResultsQuery.success) {
+		throw error(500, { message: 'Failed to fetch results' });
+	}
+	const todaysResults = todaysResultsQuery.results;
+	const averageForDay =
+		todaysResults.reduce((acc, curr) => acc + Math.min(180000, curr.time || 0), 0) /
+			todaysResults.length || 0;
+	const STANDARD_DEVIATION_THRESHOLD = 1.5; // Number of standard deviations to filter by. Lower values include less results.
+	const standardDeviation = Math.sqrt(
+		todaysResults.reduce((acc, curr) => acc + Math.pow((curr.time || 0) - averageForDay, 2), 0) /
+			todaysResults.length || 0,
+	);
+	const fastestTime = todaysResults
+		.filter(
+			(result) =>
+				result.time &&
+				result.time >= averageForDay - STANDARD_DEVIATION_THRESHOLD * standardDeviation &&
+				result.time <= averageForDay + STANDARD_DEVIATION_THRESHOLD * standardDeviation,
+		)
+		.map((result) => result.time || 0)
+		.reduce((min, curr) => (curr < min ? curr : min), gameplay.time || Infinity);
 
 	return {
 		day: gameplay.day,
