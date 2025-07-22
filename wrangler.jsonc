@@ -1,0 +1,42 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"account_id": "92cb4bb9b2a55d24f5688f2f61864079",
+	"main": ".svelte-kit/cloudflare/_worker.js",
+	"compatibility_date": "2025-05-08",
+	"assets": {
+		"binding": "ASSETS",
+		"directory": ".svelte-kit/cloudflare"
+	},
+	"observability": {
+		"enabled": true
+	},
+	"placement": {
+		"mode": "smart"
+	},
+	"env": {
+		"staging": {
+			"version_metadata": {
+				"binding": "CF_VERSION_METADATA"
+			},
+			"d1_databases": [
+				{
+					"binding": "D1",
+					"database_id": "74bed334-9c30-43a3-82a5-9bd546b149ce",
+					"database_name": "scrmbld-staging"
+				}
+			]
+		},
+		"production": {
+			"version_metadata": {
+				"binding": "CF_VERSION_METADATA"
+			},
+			"d1_databases": [
+				{
+					"binding": "D1",
+					"database_id": "864ce78f-d55c-425a-ba45-7d770e8c1f5b",
+					"database_name": "scrmbld"
+				}
+			]
+		}
+	}
+}

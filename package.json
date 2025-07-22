@@ -12,7 +12,7 @@
 		"format": "prettier --write ."
 	},
 	"devDependencies": {
-		"@cloudflare/workers-types": "^4.20241216.0",
+		"@cloudflare/workers-types": "^4.20250617.0",
 		"@sveltejs/adapter-auto": "^3.3.1",
 		"@sveltejs/kit": "^2.12.1",
 		"@sveltejs/vite-plugin-svelte": "^5.0.2",
@@ -28,12 +28,14 @@
 		"svelte-check": "^4.1.1",
 		"typescript": "^5.7.2",
 		"typescript-eslint": "^8.18.1",
-		"vite": "^6.0.3"
+		"vite": "^6.0.3",
+		"wrangler": "4.22.0"
 	},
 	"type": "module",
 	"dependencies": {
 		"@floating-ui/core": "^1.6.8",
 		"@floating-ui/dom": "^1.6.12",
+		"@sveltejs/adapter-cloudflare": "^7.1.0",
 		"svelte-confetti": "^2.2.0",
 		"ua-parser-js": "^2.0.0"
 	}
