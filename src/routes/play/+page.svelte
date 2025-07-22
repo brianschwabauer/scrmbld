@@ -5,18 +5,15 @@
 	import { randomNumberGenerator } from '$lib';
 	import FlipText from '$lib/FlipText.svelte';
 	import Keyboard from '$lib/Keyboard.svelte';
-	import Popover from '$lib/Popover.svelte';
 	import { ripple } from '$lib/ripple';
-	import { tooltip } from '$lib/tootltip.js';
 	import { untrack } from 'svelte';
-	import { Confetti } from 'svelte-confetti';
 	import { quartInOut } from 'svelte/easing';
 	import { type TransitionConfig } from 'svelte/transition';
 
 	const { data } = $props();
 	const words = $derived(data.words);
 	const today = $derived(new Date().setHours(0, 0, 0, 0));
-	const todaysWord = $derived(words.findLast(({ day }) => today >= day) || words[0]);
+	const todaysWord = $derived((words || []).findLast(({ day }) => today >= day) || words[0]);
 	const answer = $derived(todaysWord.word[0].toUpperCase());
 	const random = randomNumberGenerator();
 	let mixletters = $state(todaysWord.word.slice(1));
@@ -33,20 +30,13 @@
 	let gameplayID = $state<string | undefined>(undefined);
 	let gameplayStartSaved = $state(false);
 	let gameplayEndSaved = $state(false);
+	const alreadySolved = $derived(gameplayEndSaved && !!gameplayID);
 	const success = $derived(!!answer && attempt === answer);
 	const time = $derived(
 		times.reduce((total, [start, end]) => {
 			return total + Math.max(0, Math.round((end - start) / 1000));
 		}, 0)
 	); // number of seconds since the start of the game
-	let didCopyToClipboard = $state(false);
-	let shareButtonEl = $state<HTMLButtonElement | undefined>(undefined);
-	const useNativeShare = $derived(
-		browser &&
-			typeof navigator !== undefined &&
-			'share' in navigator &&
-			!navigator.userAgent.includes('Windows')
-	);
 	const timeDisplay = $derived.by(() => {
 		const hours = Math.floor(time / 3600);
 		const minutes = Math.floor((time % 3600) / 60);
@@ -75,43 +65,6 @@
 	const numHintsUsed = $derived(
 		Math.max(0, Math.min(7, todaysWord.word.slice(1).length - mixletters.length + hintLetters))
 	);
-	const shareURL = `https://scrmbld.app`;
-	const shareText = $derived(
-		`🆂🅲🆁🅼🅱🅻🅳`.slice(0, numHintsUsed * 2) + `🅂🄲🅁🄼🄱🄻🄳`.slice(numHintsUsed * 2) + ` ⏲${timeDisplay}`
-	);
-
-	function openNativeShare() {
-		if (!useNativeShare || typeof navigator === 'undefined' || !navigator.share) return;
-		navigator.share({
-			title: '🅂🄲🅁🄼🄱🄻🄳',
-			text: shareText
-			// url: shareURL
-		});
-	}
-
-	function shareOnTwitter() {
-		const twitterUrl = new URL(`https://twitter.com/intent/tweet`);
-		twitterUrl.searchParams.set('text', shareText);
-		// twitterUrl.searchParams.set('url', shareURL);
-		window.open(twitterUrl.href, '_blank');
-	}
-
-	function shareOnFacebook() {
-		const twitterUrl = new URL(`https://www.facebook.com/share.php`);
-		twitterUrl.searchParams.set('[title]', shareText);
-		twitterUrl.searchParams.set('u', shareURL);
-		window.open(twitterUrl.href, '_blank');
-	}
-
-	function shareToClipboard() {
-		if (typeof navigator === 'undefined') return;
-		navigator.clipboard.writeText(shareText);
-		didCopyToClipboard = true;
-		setTimeout(() => {
-			didCopyToClipboard = false;
-		}, 5000);
-	}
-
 	const audioEffects = browser
 		? [{ start: 0, end: 2.5, audio: new Audio(`${assets}/splitflap.mp3`) }]
 		: [];
@@ -270,11 +223,12 @@
 			try {
 				const savedInfo = JSON.parse(localStorage.getItem(`scrmbld_${todaysWord.day}`) || '');
 				if (savedInfo) {
-					times = savedInfo.times;
+					if (!savedInfo.gameplayID && !savedInfo.gameplayEndSaved && savedInfo.times?.length) {
+						times = savedInfo.times;
+					}
 					gameplayID = savedInfo.gameplayID;
 					gameplayStartSaved = savedInfo.gameplayStartSaved || false;
 					gameplayEndSaved = savedInfo.gameplayEndSaved || false;
-					if (savedInfo.success) attempt = answer;
 				}
 			} catch (error) {
 				// ignore
@@ -339,9 +293,22 @@
 			headers: {
 				'Content-Type': 'application/json'
 			},
-			body: JSON.stringify({ times })
+			body: JSON.stringify({ times, num_hints: numHintsUsed })
 		});
-		if (response.ok) gameplayEndSaved = true;
+		if (response.ok) {
+			localStorage.setItem(
+				`scrmbld_${todaysWord.day}`,
+				JSON.stringify({
+					...todaysWord,
+					times,
+					success,
+					gameplayID,
+					gameplayStartSaved,
+					gameplayEndSaved: true
+				})
+			);
+			window.location.href = `/results/${gameplayID}`;
+		}
 	}
 
 	$effect(() => {
@@ -353,20 +320,12 @@
 
 <svelte:window onkeyup={onWindowKeyUp} />
 
-{#if attempt === answer}
-	<div class="confetti">
-		<Confetti
-			colorRange={[120, 250]}
-			x={[-5, 5]}
-			y={[0, 8]}
-			amount={200}
-			fallDistance="50vh"
-			iterationCount={1}
-		/>
-	</div>
-{/if}
-
 <article>
+	{#if alreadySolved}
+		<a class="already-solved" href="/results/{gameplayID}" data-sveltekit-reload
+			>You've already solved today's word. Click to view results.</a
+		>
+	{/if}
 	<div class="answer" bind:this={answerEl}>
 		{#if hintLetters}
 			<FlipText
@@ -433,17 +392,10 @@
 		<FlipText word={scrambled} {usedLetters} duration={350} />
 	</div>
 	<div class="actions">
-		{#if success}
-			<button
-				use:ripple
-				onclick={() => {
-					attempt = '';
-					times = [];
-					hintLetters = 0;
-					localStorage.removeItem(`scrmbld_${todaysWord.day}`);
-					if (inputEl) inputEl.focus();
-				}}>Reset</button
-			>
+		{#if success && !alreadySolved}
+			<div style="height: 3.5rem; display: flex; align-items: center; text-align: center;">
+				Loading Results...
+			</div>
 		{:else}
 			<button
 				disabled={shuffling}
@@ -453,77 +405,32 @@
 				}}
 				use:ripple>Shuffle</button
 			>
-		{/if}
-		<div class="timer">
-			<FlipText
-				word={timeDisplay}
-				minLength={4}
-				duration={200}
-				alphabet={[
-					'',
-					'@',
-					'#',
-					'+',
-					'=',
-					'?',
-					':',
-					'0',
-					'1',
-					'2',
-					'3',
-					'4',
-					'5',
-					'6',
-					'7',
-					'8',
-					'9'
-				]}
-			/>
-		</div>
-		{#if success}
-			<button class="primary" onclick={openNativeShare} bind:this={shareButtonEl}>Share</button>
-			{#if !useNativeShare}
-				<Popover refElement={shareButtonEl} openOnClick>
-					<div class="share-popover">
-						<h3>{shareText}</h3>
-						<div class="buttons">
-							<button
-								onclick={shareToClipboard}
-								aria-label="Copy share text"
-								use:tooltip={'Copy score to clipboard'}
-								use:ripple
-							>
-								<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 24 24"
-									><path
-										fill="currentColor"
-										d="M9 18q-.825 0-1.412-.587T7 16V4q0-.825.588-1.412T9 2h9q.825 0 1.413.588T20 4v12q0 .825-.587 1.413T18 18zm-4 4q-.825 0-1.412-.587T3 20V6h2v14h11v2z"
-									></path></svg
-								>
-							</button>
-							<button
-								onclick={shareOnTwitter}
-								class="twitter"
-								use:tooltip={'Share score on Twitter/X'}
-								use:ripple
-							>
-								<img src="{assets}/x.svg" alt="Twitter Logo" />
-							</button>
-							<button
-								onclick={shareOnFacebook}
-								class="facebook"
-								use:tooltip={'Share score on Facebook'}
-								use:ripple
-							>
-								<img src="{assets}/facebook.png" alt="Facebook Logo" />
-							</button>
-						</div>
-						{#if didCopyToClipboard}
-							<p>Copied to clipboard!</p>
-						{/if}
-					</div>
-				</Popover>
-			{/if}
-		{:else}
+			<div class="timer">
+				<FlipText
+					word={timeDisplay}
+					minLength={4}
+					duration={200}
+					alphabet={[
+						'',
+						'@',
+						'#',
+						'+',
+						'=',
+						'?',
+						':',
+						'0',
+						'1',
+						'2',
+						'3',
+						'4',
+						'5',
+						'6',
+						'7',
+						'8',
+						'9'
+					]}
+				/>
+			</div>
 			{@const hintEnabled = time > (mixletters.length ? 60 : 120 + hintLetters * 60)}
 			<button
 				onclick={() => {
@@ -560,11 +467,6 @@
 </article>
 
 <style lang="scss">
-	.confetti {
-		position: fixed;
-		bottom: 0;
-		left: 50%;
-	}
 	article {
 		display: flex;
 		flex-direction: column;
@@ -572,7 +474,7 @@
 		max-width: 100vw;
 		overflow: hidden;
 		min-height: 100vh;
-		padding: 4rem 0;
+		padding: 5rem 0 4rem;
 		@media (min-width: 768px) {
 			justify-content: center;
 			padding: 0;
@@ -583,6 +485,20 @@
 				bottom: 4rem;
 			}
 		}
+	}
+	.already-solved {
+		position: fixed;
+		top: 0.5rem;
+		background-color: rgba(255, 255, 255, 0.05);
+		color: #dddddd;
+		padding: 0.5rem 1rem;
+		border-radius: 999px;
+		text-decoration: none;
+		font-size: 0.9rem;
+		font-weight: 500;
+		text-align: center;
+		text-wrap: pretty;
+		margin: 0 1rem;
 	}
 	.actions {
 		display: flex;
@@ -674,14 +590,14 @@
 		&:hover:not(:disabled) {
 			background-color: rgba(255, 255, 255, 0.1);
 		}
-		&.primary {
-			background-color: #eeeeee;
-			color: #333333;
-			&:hover {
-				background-color: #ffffff;
-				color: #000000;
-			}
-		}
+		// &.primary {
+		// 	background-color: #eeeeee;
+		// 	color: #333333;
+		// 	&:hover {
+		// 		background-color: #ffffff;
+		// 		color: #000000;
+		// 	}
+		// }
 	}
 	.timer {
 		font-size: 0.7rem;
@@ -769,54 +685,6 @@
 			letter-spacing: 0.2em;
 			text-align: left;
 			opacity: 0;
-		}
-	}
-
-	.share-popover {
-		color: #333333;
-		padding: 2rem;
-		text-align: center;
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		justify-content: center;
-		gap: 1rem 0.5rem;
-		h3 {
-			padding: 0;
-			margin: 0 0 1rem;
-			font-size: 2rem;
-		}
-		.buttons {
-			display: flex;
-			align-items: center;
-			justify-content: center;
-			gap: 0.5rem;
-		}
-		button {
-			width: 3rem;
-			height: 3rem;
-			border-radius: 100%;
-			display: flex;
-			align-items: center;
-			justify-content: center;
-			padding: 0;
-			margin: 0;
-			background-color: #eeeeee;
-			color: #333333;
-			svg,
-			img {
-				width: 1.5rem;
-				height: 1.5rem;
-			}
-			&.twitter {
-				background-color: black;
-			}
-			&.facebook {
-				img {
-					width: 100%;
-					height: 100%;
-				}
-			}
 		}
 	}
 </style>
