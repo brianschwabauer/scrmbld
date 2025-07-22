@@ -33,6 +33,7 @@ export async function POST({ request, platform, params }) {
 		}
 	}
 	if (!time) time = now - gameplay.started_at;
+	const num_hints = Math.max(0, Math.min(body?.num_hints || 0, gameplay.word.length + 1));
 	console.log(
 		`Finishing gameplay for ${gameplay.day} with word ${gameplay.word}: ${gameplay.user_uuid}`
 	);
@@ -43,10 +44,11 @@ export async function POST({ request, platform, params }) {
 			`UPDATE gameplay
 			SET ended_at = ?,
 				json = ?,
-				time = ?
+				time = ?,
+				num_hints = ?
 			WHERE uuid = ?`
 		)
-		.bind(now, JSON.stringify({ times }), time, uuid)
+		.bind(now, JSON.stringify({ times }), time, num_hints, uuid)
 		.run();
 	if (result.success) {
 		console.log(`Ran query successfully`, result);

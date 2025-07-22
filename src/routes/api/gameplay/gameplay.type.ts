@@ -23,6 +23,9 @@ export interface GamePlay {
 	/** The total duration in ms that it took to finish the game. Doesn't count breaks */
 	time?: number;
 
+	/** The number of hints used by the user to finish the game */
+	num_hints?: number;
+
 	/** The start/stop times that the user played the game. A game can be paused by closing the browser */
 	json?: { times?: [number, number][] };
 
