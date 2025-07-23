@@ -205,11 +205,9 @@
 		if (!container) return;
 		letters;
 		untrack(() => {
-			setTimeout(() => {
-				letters.forEach((letter, i) => {
-					animateLetterToTarget(i);
-				});
-			}, 1000);
+			letters.forEach((letter, i) => {
+				animateLetterToTarget(i);
+			});
 		});
 	});
 </script>
