@@ -1,19 +1,28 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
-	import { backIn } from 'svelte/easing';
-	import { scale } from 'svelte/transition';
 
 	const {
+		/** The word to animate */
 		word = '',
+		/** The minimum length of the word - this will pad 'word' with blank spaces to fit this length */
 		minLength = 7,
+		/** The total duration in ms that each letter flap should take to animate */
 		duration = 300,
+		/** The number of ms between each letter flap animation */
+		stagger = undefined as number | undefined,
+		/** The index of the start of the current selected items */
 		selectionStart = -1 as number,
+		/** The index of the end of the current selected items */
 		selectionEnd = -1 as number,
-		onlyAnimateOneLetter = false,
+		/** Whether the word is successfully guessed */
 		success = false,
+		/** Whether the word is unsuccessfully guessed */
 		error = false,
+		/** The set of letters that have been used in the current gameplay */
 		usedLetters = undefined as Set<number> | undefined,
+		/** The class to apply to the root element */
 		class: className = '',
+		/** The list of letters to rotate through in the split flap animation */
 		alphabet = [
 			'',
 			'@',
@@ -24,11 +33,12 @@
 			':',
 			...Array.from({ length: 10 }, (_, i) => String.fromCharCode(48 + i)),
 			...Array.from({ length: 26 }, (_, i) => String.fromCharCode(65 + i)),
-			' '
-		]
+			' ',
+		],
 	} = $props();
+	const MAX_LETTER_ELEMENTS = 10; // max number of letter elements to display. lower this to improve performance
 	const DURATION = $derived(duration);
-	const STAGGER = $derived(Math.floor(duration * 0.2)); // number of ms between each letter animation
+	const STAGGER = $derived(stagger ?? Math.floor(duration * 0.2)); // number of ms between each letter animation
 	const SPRING_DURATION = 1000;
 	const SPRING_EASING = `linear(0,0.009,0.035 2.1%,0.141,0.281 6.7%,0.723 12.9%,0.938 16.7%,1.017,1.077,1.121,1.149 24.3%,1.159,1.163,1.161,1.154 29.9%,1.129 32.8%,1.051 39.6%,1.017 43.1%,0.991,0.977 51%,0.974 53.8%,0.975 57.1%,0.997 69.8%,1.003 76.9%,1.004 83.8%,1)`;
 	const letters = $derived.by(() => {
@@ -40,12 +50,12 @@
 	function animateElement(
 		element: HTMLElement,
 		keyframes: Keyframe[],
-		options?: KeyframeAnimationOptions
+		options?: KeyframeAnimationOptions,
 	) {
 		const animation = element.animate(keyframes, {
 			easing: 'linear',
 			fill: 'forwards',
-			...options
+			...options,
 		});
 		animation.finished
 			.then((animation) => {
@@ -61,180 +71,129 @@
 		return animation;
 	}
 
-	let prevLetters: string[] = [];
+	const lettersState = new Map<
+		/** The index within the "letters" array that this state apply to */
+		number,
+		{
+			/** The index in the alphabet of the currently dislayed letter */
+			alphabetIndex: number;
+			/** The index of the flap element that is currently active */
+			flapIndex: number;
+			/** The flap animations for this letter. This is used to cancel previous animations */
+			flapAnimations: WeakMap<HTMLElement, Animation>;
+		}
+	>();
+	// let activeFlaps: string[] = [];
+	async function animateNextLetterFlap(letterIndex: number) {
+		if (!container || !container.children[letterIndex]) return;
+		const letterEl = container.children[letterIndex];
+		if (!letterEl) return;
+		if (!lettersState.has(letterIndex)) {
+			lettersState.set(letterIndex, {
+				alphabetIndex: 0,
+				flapIndex: 0,
+				flapAnimations: new WeakMap<HTMLElement, Animation>(),
+			});
+		}
+		const state = lettersState.get(letterIndex);
+		if (!state) return;
+		const activeFlapLetter = alphabet[state.alphabetIndex] || '';
+		if (activeFlapLetter === letters[letterIndex]) return;
+		const nextAlphabetIndex = (state.alphabetIndex + 1) % alphabet.length;
+		const staticFlapIndex = (state.flapIndex - 1 + MAX_LETTER_ELEMENTS) % MAX_LETTER_ELEMENTS;
+		const motionFlapIndex = (state.flapIndex + MAX_LETTER_ELEMENTS) % MAX_LETTER_ELEMENTS;
+		const allFlapsEls = Array.from(letterEl.children) as HTMLElement[];
+		const motionTopFlapEl = allFlapsEls[motionFlapIndex * 2];
+		const staticTopFlapEl = allFlapsEls[staticFlapIndex * 2];
+		const bottomFlapEl = allFlapsEls[motionFlapIndex * 2 + 1];
+		if (!motionTopFlapEl || !staticTopFlapEl || !bottomFlapEl) return;
+		try {
+			state.flapAnimations.get(motionTopFlapEl)?.cancel();
+			state.flapAnimations.get(staticTopFlapEl)?.cancel();
+			state.flapAnimations.get(bottomFlapEl)?.cancel();
+		} catch (error) {}
+		allFlapsEls.forEach((el, i) => {
+			if (i % 2 === 0) {
+				// Top flap
+				const flapIndex = Math.floor(i / 2);
+				el.style.zIndex = `${(flapIndex - staticFlapIndex + MAX_LETTER_ELEMENTS) % MAX_LETTER_ELEMENTS}`;
+			} else {
+				// Bottom flap
+				const flapIndex = Math.floor(i / 2) + 1;
+				el.style.zIndex = `${(motionFlapIndex - flapIndex + MAX_LETTER_ELEMENTS) % MAX_LETTER_ELEMENTS}`;
+			}
+		});
+		staticTopFlapEl.style.opacity = '1';
+		staticTopFlapEl.style.transform = 'rotate3d(1, 0, 0, 0deg)';
+		staticTopFlapEl.style.filter = 'brightness(1)';
+		bottomFlapEl.style.opacity = `0`;
+		bottomFlapEl.style.transform = `rotate3d(1, 0, 0, 90deg)`;
+		staticTopFlapEl.style.setProperty('--letter', `'${alphabet[nextAlphabetIndex]}'`);
+		motionTopFlapEl.style.setProperty(
+			'--letter',
+			`'${alphabet[nextAlphabetIndex - 1 < 0 ? alphabet.length - 1 : nextAlphabetIndex - 1]}'`,
+		);
+		bottomFlapEl.style.setProperty(
+			'--letter',
+			`'${alphabet[(nextAlphabetIndex + alphabet.length) % alphabet.length]}'`,
+		);
+
+		const topFlapAnimation = animateElement(
+			motionTopFlapEl,
+			[
+				{
+					transform: 'rotate3d(1, 0, 0, 0deg)',
+					opacity: 1,
+					offset: 0,
+					filter: 'brightness(1)',
+				},
+				{
+					transform: 'rotate3d(1, 0, 0, -90deg)',
+					opacity: 1,
+					offset: 0.99,
+					filter: 'brightness(.5)',
+				},
+				{
+					transform: 'rotate3d(1, 0, 0, -90deg)',
+					filter: 'brightness(1)',
+					opacity: 0,
+					offset: 1,
+				},
+			],
+			{ duration: DURATION },
+		);
+		const bottomFlapAnimation = animateElement(
+			bottomFlapEl,
+			[
+				{ transform: 'rotate3d(1, 0, 0, 90deg)', opacity: 1 },
+				{ transform: 'rotate3d(1, 0, 0, 0deg)', opacity: 1 },
+			],
+			{
+				duration: SPRING_DURATION,
+				delay: DURATION,
+				easing: SPRING_EASING,
+			},
+		);
+		state.flapAnimations.set(motionTopFlapEl, topFlapAnimation);
+		state.flapAnimations.set(bottomFlapEl, bottomFlapAnimation);
+		lettersState.set(letterIndex, {
+			alphabetIndex: nextAlphabetIndex,
+			flapIndex: staticFlapIndex,
+			flapAnimations: state.flapAnimations,
+		});
+		await new Promise((r) => setTimeout(r, STAGGER));
+		animateNextLetterFlap(letterIndex);
+	}
+
 	$effect(() => {
 		if (!container) return;
 		letters;
 		untrack(() => {
-			let previousAnimations: Animation[] = [];
-			previousAnimations.forEach((animation) => {
-				try {
-					animation.cancel();
-				} catch (error) {
-					// ignore
-				}
-			});
-			previousAnimations = [];
-			letters.forEach((letter, i) => {
-				if (!container?.children?.[i]) return;
-				if (letter === prevLetters[i]) return;
-				const letterEl = container.children[i];
-				const allLettersEl = Array.from(letterEl.children) as HTMLElement[];
-				const letterIndex = Math.max(0, alphabet.indexOf(letter));
-				const prevLetter = prevLetters[i] || '';
-				const prevLetterIndex = Math.max(0, alphabet.indexOf(prevLetter));
-				if (prevLetterIndex === letterIndex) return;
-				const distance = (letterIndex - prevLetterIndex + alphabet.length) % alphabet.length;
-				allLettersEl.forEach((el, j) => {
-					const index = Math.floor(j / 2);
-					const distanceFromPrevLetterIndex =
-						(index - prevLetterIndex + alphabet.length) % alphabet.length;
-					const isBetweenPrevAndNext = distanceFromPrevLetterIndex < distance;
-					const isTop = el.classList.contains('top') && !el.classList.contains('blank');
-					const isBottom = el.classList.contains('bottom') && !el.classList.contains('blank');
-					const stagger = STAGGER - Math.max(1, distance / 20) * 10;
-					if (isTop) {
-						el.style.zIndex = `${alphabet.length - distanceFromPrevLetterIndex + 1}`;
-						if (index === letterIndex) {
-							el.getAnimations().forEach((animation) => {
-								try {
-									animation.cancel();
-								} catch (error) {
-									// ignore
-								}
-							});
-							el.style.opacity = '1';
-							el.style.transform = 'rotate3d(1, 0, 0, 0deg)';
-							el.style.filter = 'none';
-						} else if (onlyAnimateOneLetter && index === prevLetterIndex) {
-							previousAnimations.push(
-								animateElement(
-									el,
-									[
-										{
-											transform: 'rotate3d(1, 0, 0, 0deg)',
-											opacity: 1,
-											offset: 0,
-											filter: 'brightness(1)'
-										},
-										{
-											transform: 'rotate3d(1, 0, 0, -90deg)',
-											opacity: 1,
-											offset: 0.99,
-											filter: 'brightness(.5)'
-										},
-										{
-											transform: 'rotate3d(1, 0, 0, -90deg)',
-											filter: 'brightness(1)',
-											opacity: 0,
-											offset: 1
-										}
-									],
-									{
-										duration: DURATION,
-										delay: 0
-									}
-								)
-							);
-						} else if (!onlyAnimateOneLetter && isBetweenPrevAndNext) {
-							previousAnimations.push(
-								animateElement(
-									el,
-									[
-										{
-											transform: 'rotate3d(1, 0, 0, 0deg)',
-											opacity: 1,
-											offset: 0,
-											filter: 'brightness(1)'
-										},
-										{
-											transform: 'rotate3d(1, 0, 0, -90deg)',
-											opacity: 1,
-											offset: 0.99,
-											filter: 'brightness(.5)'
-										},
-										{
-											transform: 'rotate3d(1, 0, 0, -90deg)',
-											filter: 'brightness(1)',
-											opacity: 0,
-											offset: 1
-										}
-									],
-									{
-										duration: DURATION,
-										delay: distanceFromPrevLetterIndex * stagger
-									}
-								)
-							);
-						} else {
-							previousAnimations.push(
-								animateElement(
-									el,
-									[{ transform: 'rotate3d(1, 0, 0, 90deg)', opacity: 0, filter: 'brightness(1)' }],
-									{
-										duration: DURATION,
-										delay: distanceFromPrevLetterIndex * stagger
-									}
-								)
-							);
-						}
-					}
-					if (isBottom) {
-						const distanceFromLetterIndex =
-							(index - letterIndex - 1 + alphabet.length) % alphabet.length;
-						el.style.zIndex = `${distanceFromLetterIndex + 1}`;
-						if (index === prevLetterIndex) {
-							el.getAnimations().forEach((animation) => {
-								try {
-									animation.cancel();
-								} catch (error) {
-									// ignore
-								}
-							});
-							el.style.opacity = `1`;
-							el.style.transform = `rotate3d(1, 0, 0, 0deg)`;
-						} else if (onlyAnimateOneLetter && index === letterIndex) {
-							el.style.opacity = `0`;
-							el.style.transform = `rotate3d(1, 0, 0, 90deg)`;
-							previousAnimations.push(
-								animateElement(
-									el,
-									[
-										{ transform: 'rotate3d(1, 0, 0, 90deg)', opacity: 1 },
-										{ transform: 'rotate3d(1, 0, 0, 0deg)', opacity: 1 }
-									],
-									{
-										duration: SPRING_DURATION,
-										delay: DURATION,
-										easing: SPRING_EASING
-									}
-								)
-							);
-						} else if (!onlyAnimateOneLetter && distanceFromPrevLetterIndex <= distance) {
-							el.style.opacity = `0`;
-							el.style.transform = `rotate3d(1, 0, 0, 90deg)`;
-							previousAnimations.push(
-								animateElement(
-									el,
-									[
-										{ transform: 'rotate3d(1, 0, 0, 90deg)', opacity: 1 },
-										{ transform: 'rotate3d(1, 0, 0, 0deg)', opacity: 1 }
-									],
-									{
-										duration: SPRING_DURATION,
-										delay: distanceFromPrevLetterIndex * stagger + DURATION,
-										easing: SPRING_EASING
-									}
-								)
-							);
-						} else {
-							el.style.opacity = `0`;
-							el.style.transform = `rotate3d(1, 0, 0, 90deg)`;
-						}
-					}
+			setTimeout(() => {
+				letters.forEach((letter, i) => {
+					animateNextLetterFlap(i);
 				});
-			});
-			prevLetters = $state.snapshot(letters);
+			}, 1000);
 		});
 	});
 </script>
@@ -253,14 +212,10 @@
 				? i >= selectionStart && i < selectionEnd
 				: i >= selectionStart && i <= selectionEnd}
 		>
-			{#each alphabet as l (l)}
-				<div class="part top">{l}</div>
-				<div class="part bottom">
-					{l}
-				</div>
+			{#each new Array(MAX_LETTER_ELEMENTS) as _, j (j)}
+				<div class="part top"></div>
+				<div class="part bottom"></div>
 			{/each}
-			<div class="blank top"></div>
-			<div class="blank bottom"></div>
 		</div>
 	{/each}
 </div>
@@ -326,6 +281,7 @@
 				1px 1px 1px 0px rgba(0, 0, 0, 0.8),
 				2px 2px 4px 0px rgba(0, 0, 0, 0.25);
 			border-radius: 0.05em;
+			contain: content;
 			&::after {
 				content: '';
 				position: absolute;
@@ -343,8 +299,7 @@
 				outline: solid 0.03em #aaaaaa;
 				color: #ffffff;
 			}
-			.part,
-			.blank {
+			.part {
 				grid-column: 1 / 1;
 				grid-row: 1 / 1;
 				font-size: 2em;
@@ -359,6 +314,9 @@
 				transform-origin: center center;
 				will-change: transform, opacity;
 				border-radius: 2px;
+				&:global(::before) {
+					content: var(--letter, ' ');
+				}
 				&.top {
 					--clip: calc(50% - var(--gap) / 2);
 					clip-path: polygon(0 0, 100% 0, 100% var(--clip), 0 var(--clip));

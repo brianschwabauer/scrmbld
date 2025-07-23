@@ -328,7 +328,6 @@
 				class="hint"
 				word={answer.slice(0, hintLetters)}
 				duration={wasKeyboardInput ? 100 : 150}
-				onlyAnimateOneLetter={wasKeyboardInput}
 				success
 				minLength={hintLetters}
 			/>
@@ -338,7 +337,6 @@
 			duration={wasKeyboardInput ? 100 : 150}
 			{selectionEnd}
 			{selectionStart}
-			onlyAnimateOneLetter={wasKeyboardInput}
 			{success}
 			error={attempt.length === answer.length && !success}
 			minLength={answer.length - hintLetters}

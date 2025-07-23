@@ -110,7 +110,7 @@
 
 <article>
 	{#if showConfetti}
-		<div class="confetti">
+		<!-- <div class="confetti">
 			<Confetti
 				colorRange={[120, 250]}
 				x={[-5, 5]}
@@ -123,7 +123,7 @@
 				fallDistance="200px"
 				iterationCount={1}
 			/>
-		</div>
+		</div> -->
 	{/if}
 	<h1>
 		{#if data.isCurrentUser}
@@ -143,7 +143,7 @@
 		word={getTimeDisplay(data.time)}
 		minLength={4}
 		class="my-time"
-		duration={500}
+		duration={400}
 		{alphabet}
 	></FlipText>
 
@@ -168,13 +168,12 @@
 				]}
 				minLength={0}
 				duration={300}
-				onlyAnimateOneLetter
 			></FlipText>
 		</div>
 		{#if data.isCurrentUser}
 			<div class="detail">
 				<span class="label">Word</span>
-				<FlipText word={data.word} minLength={0} duration={300} onlyAnimateOneLetter></FlipText>
+				<FlipText word={data.word} minLength={0} duration={300}></FlipText>
 			</div>
 		{/if}
 		<div class="detail">
@@ -183,18 +182,12 @@
 				word={getTimeDisplay(data.averageForDay || 0)}
 				minLength={0}
 				duration={300}
-				onlyAnimateOneLetter
 				{alphabet}
 			></FlipText>
 		</div>
 		<div class="detail">
 			<span class="label">Today's Fastest Time</span>
-			<FlipText
-				word={getTimeDisplay(data.fastestTime || 0)}
-				minLength={0}
-				duration={300}
-				onlyAnimateOneLetter
-				{alphabet}
+			<FlipText word={getTimeDisplay(data.fastestTime || 0)} minLength={0} duration={300} {alphabet}
 			></FlipText>
 		</div>
 		<div class="detail">
@@ -207,7 +200,6 @@
 				word={getTimeDisplay(data.userWeeklyAverage || 0)}
 				minLength={0}
 				duration={300}
-				onlyAnimateOneLetter
 				{alphabet}
 			></FlipText>
 		</div>
@@ -339,11 +331,11 @@
 </article>
 
 <style>
-	.confetti {
+	/* .confetti {
 		position: fixed;
 		bottom: 0;
 		left: 50%;
-	}
+	} */
 	article {
 		display: flex;
 		flex-direction: column;
