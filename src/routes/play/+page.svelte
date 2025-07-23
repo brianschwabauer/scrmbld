@@ -9,6 +9,7 @@
 	import { untrack } from 'svelte';
 	import { quartInOut } from 'svelte/easing';
 	import { type TransitionConfig } from 'svelte/transition';
+	import type { GamePlay } from '../api/gameplay/gameplay.type';
 
 	const { data } = $props();
 	const words = $derived(data.words);
@@ -35,7 +36,7 @@
 	const time = $derived(
 		times.reduce((total, [start, end]) => {
 			return total + Math.max(0, Math.round((end - start) / 1000));
-		}, 0)
+		}, 0),
 	); // number of seconds since the start of the game
 	const timeDisplay = $derived.by(() => {
 		const hours = Math.floor(time / 3600);
@@ -63,7 +64,7 @@
 		return letterIndexes;
 	});
 	const numHintsUsed = $derived(
-		Math.max(0, Math.min(7, todaysWord.word.slice(1).length - mixletters.length + hintLetters))
+		Math.max(0, Math.min(7, todaysWord.word.slice(1).length - mixletters.length + hintLetters)),
 	);
 	const audioEffects = browser
 		? [{ start: 0, end: 2.5, audio: new Audio(`${assets}/splitflap.mp3`) }]
@@ -164,7 +165,7 @@
 					width: calc(var(--width) * ${t});
 					opacity: ${t};
 				`;
-			}
+			},
 		};
 	}
 
@@ -190,8 +191,8 @@
 					success,
 					gameplayID,
 					gameplayStartSaved,
-					gameplayEndSaved
-				})
+					gameplayEndSaved,
+				}),
 			);
 		}
 	});
@@ -205,12 +206,12 @@
 					{ transform: 'translate3d(7px, 0, 0)' },
 					{ transform: 'translate3d(-15px, 0, 0)' },
 					{ transform: 'translate3d(15px, 0, 0)' },
-					{ transform: 'translate3d(0px, 0, 0)' }
+					{ transform: 'translate3d(0px, 0, 0)' },
 				],
 				{
 					easing: 'ease-in-out',
-					duration: 350
-				}
+					duration: 350,
+				},
 			);
 		}
 	});
@@ -223,7 +224,7 @@
 			try {
 				const savedInfo = JSON.parse(localStorage.getItem(`scrmbld_${todaysWord.day}`) || '');
 				if (savedInfo) {
-					if (!savedInfo.gameplayID && !savedInfo.gameplayEndSaved && savedInfo.times?.length) {
+					if (!savedInfo.gameplayEndSaved && savedInfo.times?.length) {
 						times = savedInfo.times;
 					}
 					gameplayID = savedInfo.gameplayID;
@@ -257,8 +258,8 @@
 							success,
 							gameplayID,
 							gameplayStartSaved,
-							gameplayEndSaved
-						})
+							gameplayEndSaved,
+						}),
 					);
 				}, 1000);
 			}, 1500);
@@ -271,12 +272,12 @@
 		const response = await fetch('/api/gameplay', {
 			method: 'POST',
 			headers: {
-				'Content-Type': 'application/json'
+				'Content-Type': 'application/json',
 			},
 			body: JSON.stringify({
 				word: todaysWord.word[0],
-				day: todaysWord.day
-			})
+				day: todaysWord.day,
+			}),
 		});
 		if (response.ok) {
 			const { uuid } = await response.json<any>();
@@ -288,27 +289,22 @@
 	// Log the gameplay end when the user succeeds
 	async function saveGameplayEnd() {
 		if (!gameplayID) return;
-		const response = await fetch(`/api/gameplay/${gameplayID}/finish`, {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json'
-			},
-			body: JSON.stringify({ times, num_hints: numHintsUsed })
-		});
-		if (response.ok) {
-			localStorage.setItem(
-				`scrmbld_${todaysWord.day}`,
-				JSON.stringify({
-					...todaysWord,
-					times,
-					success,
-					gameplayID,
-					gameplayStartSaved,
-					gameplayEndSaved: true
-				})
-			);
-			window.location.href = `/results/${gameplayID}`;
-		}
+		localStorage.setItem(
+			`scrmbld_${todaysWord.day}`,
+			JSON.stringify({
+				...todaysWord,
+				times,
+				success,
+				gameplayID,
+				gameplayStartSaved,
+				gameplayEndSaved: true,
+			}),
+		);
+		const state = JSON.stringify({
+			json: { times },
+			num_hints: numHintsUsed,
+		} as Partial<GamePlay>);
+		window.location.href = `/results/${gameplayID}?state=${btoa(state).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')}`;
 	}
 
 	$effect(() => {
@@ -427,7 +423,7 @@
 						'6',
 						'7',
 						'8',
-						'9'
+						'9',
 					]}
 				/>
 			</div>

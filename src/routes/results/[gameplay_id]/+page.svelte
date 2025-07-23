@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { browser } from '$app/environment';
+	import { goto } from '$app/navigation';
 	import { assets } from '$app/paths';
 	import { page } from '$app/state';
 	import FlipText from '$lib/FlipText.svelte';
@@ -12,16 +13,17 @@
 	const { data } = $props();
 	const copiedTextToClipboard = new SvelteSet<string>();
 	let shareButtonEl = $state<HTMLButtonElement | undefined>(undefined);
+	let showConfetti = $state(false);
 	const useNativeShare = $derived(
 		browser &&
 			typeof navigator !== undefined &&
 			'share' in navigator &&
-			!navigator.userAgent.includes('Windows')
+			!navigator.userAgent.includes('Windows'),
 	);
 	const shareText = $derived(
 		`🆂🅲🆁🅼🅱🅻🅳`.slice(0, data.numHintsUsed * 2) +
 			`🅂🄲🅁🄼🄱🄻🄳`.slice(data.numHintsUsed * 2) +
-			` ⏲${getTimeDisplay(data.time)}`
+			` ⏲${getTimeDisplay(data.time)}`,
 	);
 	const shareURL = $derived.by(() => {
 		const url = new URL(page.url.href);
@@ -39,7 +41,7 @@
 		...Array.from({ length: 26 }, (_, i) => String.fromCharCode(65 + i)),
 		':',
 		...Array.from({ length: 10 }, (_, i) => String.fromCharCode(48 + i)),
-		' '
+		' ',
 	];
 
 	function getTimeDisplay(ms: number) {
@@ -60,7 +62,7 @@
 		navigator.share({
 			title: '🅂🄲🅁🄼🄱🄻🄳',
 			text: shareText,
-			url: shareURL
+			url: shareURL,
 		});
 	}
 
@@ -83,17 +85,42 @@
 		navigator.clipboard.writeText(text);
 		copiedTextToClipboard.add(text);
 	}
+
+	$effect(() => {
+		if (page.url.searchParams.has('state')) {
+			const newUrl = new URL(page.url.href);
+			newUrl.searchParams.delete('state');
+			goto(newUrl.href, {
+				replaceState: true,
+				noScroll: true,
+				keepFocus: true,
+				invalidateAll: false,
+			});
+		}
+	});
+
+	$effect(() => {
+		if (data.isCurrentUser) {
+			setTimeout(() => {
+				showConfetti = true;
+			}, 1500);
+		}
+	});
 </script>
 
 <article>
-	{#if browser}
+	{#if showConfetti}
 		<div class="confetti">
 			<Confetti
 				colorRange={[120, 250]}
 				x={[-5, 5]}
 				y={[0, 8]}
 				amount={200}
-				fallDistance="50vh"
+				destroyOnComplete
+				disableForReducedMotion
+				rounded
+				duration={4000}
+				fallDistance="200px"
 				iterationCount={1}
 			/>
 		</div>
@@ -126,7 +153,7 @@
 			<FlipText
 				word={new Date(data.day).toLocaleDateString(undefined, {
 					timeZone: 'UTC',
-					dateStyle: 'short'
+					dateStyle: 'short',
 				})}
 				alphabet={[
 					'',
@@ -137,16 +164,17 @@
 					'?',
 					':',
 					...Array.from({ length: 10 }, (_, i) => String.fromCharCode(48 + i)),
-					'/'
+					'/',
 				]}
 				minLength={0}
-				duration={500}
+				duration={300}
+				onlyAnimateOneLetter
 			></FlipText>
 		</div>
 		{#if data.isCurrentUser}
 			<div class="detail">
 				<span class="label">Word</span>
-				<FlipText word={data.word} minLength={0} duration={500}></FlipText>
+				<FlipText word={data.word} minLength={0} duration={300} onlyAnimateOneLetter></FlipText>
 			</div>
 		{/if}
 		<div class="detail">
@@ -154,13 +182,19 @@
 			<FlipText
 				word={getTimeDisplay(data.averageForDay || 0)}
 				minLength={0}
-				duration={500}
+				duration={300}
+				onlyAnimateOneLetter
 				{alphabet}
 			></FlipText>
 		</div>
 		<div class="detail">
 			<span class="label">Today's Fastest Time</span>
-			<FlipText word={getTimeDisplay(data.fastestTime || 0)} minLength={0} duration={500} {alphabet}
+			<FlipText
+				word={getTimeDisplay(data.fastestTime || 0)}
+				minLength={0}
+				duration={300}
+				onlyAnimateOneLetter
+				{alphabet}
 			></FlipText>
 		</div>
 		<div class="detail">
@@ -172,7 +206,8 @@
 			<FlipText
 				word={getTimeDisplay(data.userWeeklyAverage || 0)}
 				minLength={0}
-				duration={500}
+				duration={300}
+				onlyAnimateOneLetter
 				{alphabet}
 			></FlipText>
 		</div>
