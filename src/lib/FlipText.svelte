@@ -60,7 +60,10 @@
 		animation.finished
 			.then((animation) => {
 				try {
-					animation.commitStyles();
+					const { transform, opacity, filter } = keyframes[keyframes.length - 1];
+					if (transform) element.style.transform = transform as string;
+					if (opacity) element.style.opacity = opacity as string;
+					if (filter) element.style.filter = filter as string;
 					animation.cancel();
 				} catch (error) {
 					// ignore
@@ -83,106 +86,119 @@
 			flapAnimations: WeakMap<HTMLElement, Animation>;
 		}
 	>();
-	// let activeFlaps: string[] = [];
-	async function animateNextLetterFlap(letterIndex: number) {
+	async function animateLetterToTarget(letterIndex: number) {
 		if (!container || !container.children[letterIndex]) return;
 		const letterEl = container.children[letterIndex];
 		if (!letterEl) return;
+
 		if (!lettersState.has(letterIndex)) {
 			lettersState.set(letterIndex, {
-				alphabetIndex: 0,
+				alphabetIndex: 0, // Start from the beginning of the alphabet
 				flapIndex: 0,
 				flapAnimations: new WeakMap<HTMLElement, Animation>(),
 			});
 		}
-		const state = lettersState.get(letterIndex);
-		if (!state) return;
-		const activeFlapLetter = alphabet[state.alphabetIndex] || '';
-		if (activeFlapLetter === letters[letterIndex]) return;
-		const nextAlphabetIndex = (state.alphabetIndex + 1) % alphabet.length;
-		const staticFlapIndex = (state.flapIndex - 1 + MAX_LETTER_ELEMENTS) % MAX_LETTER_ELEMENTS;
-		const motionFlapIndex = (state.flapIndex + MAX_LETTER_ELEMENTS) % MAX_LETTER_ELEMENTS;
-		const allFlapsEls = Array.from(letterEl.children) as HTMLElement[];
-		const motionTopFlapEl = allFlapsEls[motionFlapIndex * 2];
-		const staticTopFlapEl = allFlapsEls[staticFlapIndex * 2];
-		const bottomFlapEl = allFlapsEls[motionFlapIndex * 2 + 1];
-		if (!motionTopFlapEl || !staticTopFlapEl || !bottomFlapEl) return;
-		try {
-			state.flapAnimations.get(motionTopFlapEl)?.cancel();
-			state.flapAnimations.get(staticTopFlapEl)?.cancel();
-			state.flapAnimations.get(bottomFlapEl)?.cancel();
-		} catch (error) {}
-		allFlapsEls.forEach((el, i) => {
-			if (i % 2 === 0) {
-				// Top flap
-				const flapIndex = Math.floor(i / 2);
-				el.style.zIndex = `${(flapIndex - staticFlapIndex + MAX_LETTER_ELEMENTS) % MAX_LETTER_ELEMENTS}`;
-			} else {
-				// Bottom flap
-				const flapIndex = Math.floor(i / 2) + 1;
-				el.style.zIndex = `${(motionFlapIndex - flapIndex + MAX_LETTER_ELEMENTS) % MAX_LETTER_ELEMENTS}`;
-			}
-		});
-		staticTopFlapEl.style.opacity = '1';
-		staticTopFlapEl.style.transform = 'rotate3d(1, 0, 0, 0deg)';
-		staticTopFlapEl.style.filter = 'brightness(1)';
-		bottomFlapEl.style.opacity = `0`;
-		bottomFlapEl.style.transform = `rotate3d(1, 0, 0, 90deg)`;
-		staticTopFlapEl.style.setProperty('--letter', `'${alphabet[nextAlphabetIndex]}'`);
-		motionTopFlapEl.style.setProperty(
-			'--letter',
-			`'${alphabet[nextAlphabetIndex - 1 < 0 ? alphabet.length - 1 : nextAlphabetIndex - 1]}'`,
-		);
-		bottomFlapEl.style.setProperty(
-			'--letter',
-			`'${alphabet[(nextAlphabetIndex + alphabet.length) % alphabet.length]}'`,
-		);
 
-		const topFlapAnimation = animateElement(
-			motionTopFlapEl,
-			[
+		// Loop until the target letter is reached for this position
+		while (true) {
+			const state = lettersState.get(letterIndex);
+			if (!state) break; // Should not happen under normal circumstances
+
+			const currentDisplayedLetter = alphabet[state.alphabetIndex] || '';
+			const targetLetter = letters[letterIndex];
+
+			// If the currently displayed letter matches the target, stop animating this letter
+			if (currentDisplayedLetter === targetLetter) {
+				break; // Exit the loop for this specific letter
+			}
+
+			const nextAlphabetIndex = (state.alphabetIndex + 1) % alphabet.length;
+			const staticFlapIndex = (state.flapIndex - 1 + MAX_LETTER_ELEMENTS) % MAX_LETTER_ELEMENTS;
+			const motionFlapIndex = (state.flapIndex + MAX_LETTER_ELEMENTS) % MAX_LETTER_ELEMENTS;
+			const allFlapsEls = Array.from(letterEl.children) as HTMLElement[];
+			const motionTopFlapEl = allFlapsEls[motionFlapIndex * 2];
+			const staticTopFlapEl = allFlapsEls[staticFlapIndex * 2];
+			const bottomFlapEl = allFlapsEls[motionFlapIndex * 2 + 1];
+			if (!motionTopFlapEl || !staticTopFlapEl || !bottomFlapEl) break; // Safety break if DOM elements are missing
+
+			// Cancel any ongoing animations on the flaps involved in the current step
+			try {
+				state.flapAnimations.get(motionTopFlapEl)?.cancel();
+				state.flapAnimations.get(staticTopFlapEl)?.cancel();
+				state.flapAnimations.get(bottomFlapEl)?.cancel();
+			} catch (error) {
+				// Ignore errors from cancelling animations that might not exist or be active
+			}
+
+			// Set z-index for visual stacking during the flip
+			allFlapsEls.forEach((el, i) => {
+				if (i % 2 === 0) {
+					// Top flap
+					const flapIndex = Math.floor(i / 2);
+					el.style.zIndex = `${(flapIndex - staticFlapIndex + MAX_LETTER_ELEMENTS) % MAX_LETTER_ELEMENTS}`;
+				} else {
+					// Bottom flap
+					const flapIndex = Math.floor(i / 2) + 1;
+					el.style.zIndex = `${(motionFlapIndex - flapIndex + MAX_LETTER_ELEMENTS) % MAX_LETTER_ELEMENTS}`;
+				}
+			});
+
+			// Set initial states for the flaps before animation
+			staticTopFlapEl.style.opacity = '1';
+			staticTopFlapEl.style.transform = 'rotate3d(1, 0, 0, 0deg)';
+			staticTopFlapEl.style.filter = 'brightness(1)';
+			bottomFlapEl.style.opacity = `0`;
+			bottomFlapEl.style.transform = `rotate3d(1, 0, 0, 90deg)`;
+
+			// Set the CSS variables for the letters on the flaps for the current flip
+			staticTopFlapEl.style.setProperty('--letter', `'${alphabet[nextAlphabetIndex]}'`);
+			motionTopFlapEl.style.setProperty('--letter', `'${currentDisplayedLetter}'`);
+			bottomFlapEl.style.setProperty('--letter', `'${alphabet[nextAlphabetIndex]}'`);
+
+			// Initiate Web Animations
+			const topFlapAnimation = animateElement(
+				motionTopFlapEl,
+				[
+					{ transform: 'rotate3d(1, 0, 0, 0deg)', opacity: 1, offset: 0, filter: 'brightness(1)' },
+					{
+						transform: 'rotate3d(1, 0, 0, -90deg)',
+						opacity: 1,
+						offset: 0.99,
+						filter: 'brightness(.5)',
+					},
+					{
+						transform: 'rotate3d(1, 0, 0, -90deg)',
+						filter: 'brightness(1)',
+						opacity: 0,
+						offset: 1,
+					},
+				],
+				{ duration: DURATION },
+			);
+			const bottomFlapAnimation = animateElement(
+				bottomFlapEl,
+				[
+					{ transform: 'rotate3d(1, 0, 0, 90deg)', opacity: 1 },
+					{ transform: 'rotate3d(1, 0, 0, 0deg)', opacity: 1 },
+				],
 				{
-					transform: 'rotate3d(1, 0, 0, 0deg)',
-					opacity: 1,
-					offset: 0,
-					filter: 'brightness(1)',
+					duration: SPRING_DURATION,
+					delay: DURATION,
+					easing: SPRING_EASING,
 				},
-				{
-					transform: 'rotate3d(1, 0, 0, -90deg)',
-					opacity: 1,
-					offset: 0.99,
-					filter: 'brightness(.5)',
-				},
-				{
-					transform: 'rotate3d(1, 0, 0, -90deg)',
-					filter: 'brightness(1)',
-					opacity: 0,
-					offset: 1,
-				},
-			],
-			{ duration: DURATION },
-		);
-		const bottomFlapAnimation = animateElement(
-			bottomFlapEl,
-			[
-				{ transform: 'rotate3d(1, 0, 0, 90deg)', opacity: 1 },
-				{ transform: 'rotate3d(1, 0, 0, 0deg)', opacity: 1 },
-			],
-			{
-				duration: SPRING_DURATION,
-				delay: DURATION,
-				easing: SPRING_EASING,
-			},
-		);
-		state.flapAnimations.set(motionTopFlapEl, topFlapAnimation);
-		state.flapAnimations.set(bottomFlapEl, bottomFlapAnimation);
-		lettersState.set(letterIndex, {
-			alphabetIndex: nextAlphabetIndex,
-			flapIndex: staticFlapIndex,
-			flapAnimations: state.flapAnimations,
-		});
-		await new Promise((r) => setTimeout(r, STAGGER));
-		animateNextLetterFlap(letterIndex);
+			);
+
+			// Store references to current animations for potential cancellation
+			state.flapAnimations.set(motionTopFlapEl, topFlapAnimation);
+			state.flapAnimations.set(bottomFlapEl, bottomFlapAnimation);
+
+			// Update the state for the next iteration of the loop (if needed)
+			state.alphabetIndex = nextAlphabetIndex;
+			state.flapIndex = staticFlapIndex;
+
+			// Wait for the staggering delay before potentially initiating the next flap animation
+			await new Promise((r) => setTimeout(r, STAGGER));
+		}
 	}
 
 	$effect(() => {
@@ -191,7 +207,7 @@
 		untrack(() => {
 			setTimeout(() => {
 				letters.forEach((letter, i) => {
-					animateNextLetterFlap(i);
+					animateLetterToTarget(i);
 				});
 			}, 1000);
 		});
