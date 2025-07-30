@@ -64,23 +64,46 @@ export async function load({ platform, params, cookies, url }) {
 		gameplay.json = { times };
 	}
 
-	const [todaysResultsQuery, { avg_time: userWeeklyAverage }] = await Promise.all([
-		D1.prepare(
-			`SELECT * FROM gameplay WHERE day = ? AND time IS NOT NULL AND time >= 15000 AND time <= 600000 ORDER BY ended_at DESC LIMIT 200`,
-		)
-			.bind(gameplay.day)
-			.all<GamePlay>(),
-		D1.prepare(
-			`SELECT AVG(time) as avg_time FROM gameplay WHERE user_uuid = ? AND day <= ? AND day >= ? AND time IS NOT NULL`,
-		)
-			.bind(gameplay.user_uuid, gameplay.day, gameplay.day - 7 * 86400000) // 7 days in milliseconds
-			.first<{ avg_time: number }>()
-			.then((res) => res || { avg_time: null }),
-	]);
+	const [todaysResultsQuery, { avg_time: userWeeklyAverage }, userPlayHistoryQuery] =
+		await Promise.all([
+			D1.prepare(
+				`SELECT * FROM gameplay WHERE day = ? AND time IS NOT NULL AND time >= 15000 AND time <= 600000 ORDER BY ended_at DESC LIMIT 200`,
+			)
+				.bind(gameplay.day)
+				.all<GamePlay>(),
+			D1.prepare(
+				`SELECT AVG(time) as avg_time FROM gameplay WHERE user_uuid = ? AND day <= ? AND day >= ? AND time IS NOT NULL`,
+			)
+				.bind(gameplay.user_uuid, gameplay.day, gameplay.day - 7 * 86400000) // 7 days in milliseconds
+				.first<{ avg_time: number }>()
+				.then((res) => res || { avg_time: null }),
+			D1.prepare(
+				`SELECT DISTINCT day FROM gameplay WHERE user_uuid = ? AND ended_at IS NOT NULL ORDER BY day DESC`,
+			)
+				.bind(gameplay.user_uuid)
+				.all<{ day: number }>(),
+		]);
 	if (!todaysResultsQuery.success) {
 		throw error(500, { message: 'Failed to fetch results' });
 	}
 	const todaysResults = todaysResultsQuery.results;
+	let streak = 0;
+	if (userPlayHistoryQuery.success && userPlayHistoryQuery.results) {
+		const days = userPlayHistoryQuery.results.map((d) => d.day).sort((a, b) => b - a);
+		const today = new Date(gameplay.day).setUTCHours(0, 0, 0, 0);
+		if (days[0] === today) {
+			streak = 1;
+			for (let i = 1; i < days.length; i++) {
+				const day = days[i - 1];
+				const prevDay = days[i];
+				if (day - prevDay === 86400000) {
+					streak++;
+				} else {
+					break;
+				}
+			}
+		}
+	}
 	const averageForDay =
 		todaysResults.reduce((acc, curr) => acc + Math.min(180000, curr.time || 0), 0) /
 			todaysResults.length || 0;
@@ -108,5 +131,6 @@ export async function load({ platform, params, cookies, url }) {
 		fastestTime,
 		numHintsUsed: gameplay.num_hints || 0,
 		isCurrentUser: user_uuid && user_uuid === gameplay.user_uuid,
+		streak,
 	};
 }

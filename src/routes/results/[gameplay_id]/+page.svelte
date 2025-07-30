@@ -203,6 +203,12 @@
 				{alphabet}
 			></FlipText>
 		</div>
+		{#if data.isCurrentUser && data.streak > 1}
+			<div class="detail">
+				<span class="label">Streak</span>
+				<FlipText word={`${data.streak} days`} minLength={0} duration={300} {alphabet}></FlipText>
+			</div>
+		{/if}
 	</div>
 
 	{#if !data.isCurrentUser}
