@@ -31,6 +31,10 @@
 		url.hash = '';
 		return url.href;
 	});
+	const firstUserResult = $derived(Math.min(...Object.keys(data.userHistory).map((day) => +day)));
+	const numStreakWeeks = $derived(
+		Math.max(12, Math.min(52, Math.ceil((data.day - firstUserResult) / (7 * 24 * 60 * 60 * 1000)))),
+	);
 	const alphabet = [
 		'',
 		'@',
@@ -203,7 +207,62 @@
 				{alphabet}
 			></FlipText>
 		</div>
+		<div class="detail">
+			{#if data.isCurrentUser}
+				<span class="label">My Steak</span>
+			{:else}
+				<span class="label">Friend's Streak</span>
+			{/if}
+			<FlipText word={`${data.userStreak}`.padStart(4, ' ')} minLength={0} duration={300} {alphabet}
+			></FlipText>
+		</div>
 	</div>
+
+	{#if data.userHistory}
+		<div class="streak">
+			{#each { length: numStreakWeeks } as _, i}
+				<div class="week">
+					{#each { length: 7 } as _, j}
+						{@const dayOfWeek = new Date(data.day).getUTCDay()}
+						{@const day = data.day - (dayOfWeek - 6 + (i * 7 + j)) * 24 * 60 * 60 * 1000}
+						{@const result = data.userHistory[`${day}`]}
+						{@const date = new Date(day).toLocaleDateString(undefined, {
+							timeZone: 'UTC',
+							dateStyle: 'short',
+						})}
+						<span
+							class="day"
+							class:today={day === data.day}
+							class:future={day > data.day}
+							class:success={!!result}
+							class:attempted={result !== undefined}
+							use:tooltip={result === undefined
+								? date
+								: result
+									? `${date} - Solved in ${getTimeDisplay(result)}`
+									: `${date} - Failed to solve`}
+						>
+							<!-- {#if j === 0}
+								S
+							{:else if j === 1}
+								F
+							{:else if j === 2}
+								T
+							{:else if j === 3}
+								W
+							{:else if j === 4}
+								T
+							{:else if j === 5}
+								M
+							{:else if j === 6}
+								S
+							{/if} -->
+						</span>
+					{/each}
+				</div>
+			{/each}
+		</div>
+	{/if}
 
 	{#if !data.isCurrentUser}
 		<p style="max-width: 350px; text-align: center; margin: 1rem auto 1.5rem; text-wrap: balance;">
@@ -415,6 +474,62 @@
 			}
 		}
 	}
+
+	.streak {
+		display: flex;
+		align-items: center;
+		flex-direction: row-reverse;
+		justify-content: center;
+		width: calc(100% - 1rem);
+		max-width: 700px;
+		gap: 2px;
+		padding: 0 1rem;
+		margin-bottom: 1.5rem;
+		z-index: 1;
+		.week {
+			display: flex;
+			flex-direction: column-reverse;
+			align-items: center;
+			flex: 1;
+			gap: 2px;
+			max-width: 25px;
+		}
+		.day {
+			aspect-ratio: 0.8;
+			background-color: #5c5c5c;
+			width: 100%;
+			border-radius: 10%;
+			font-weight: bold;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			font-size: 0.8rem;
+			transition: color 150ms ease;
+			user-select: none;
+			color: transparent;
+			color: #777777;
+			&:hover {
+				color: #cccccc;
+			}
+			&.future {
+				opacity: 0.5;
+			}
+			&.today {
+				outline: solid 2px #bbbbbb;
+				outline-offset: 1px;
+				z-index: 2;
+			}
+			&.attempted:not(.success) {
+				background-color: #ef6262;
+				color: #ffffff;
+			}
+			&.success {
+				background-color: #00b7a1;
+				color: #ffffff;
+			}
+		}
+	}
+
 	.share-popover {
 		color: #333333;
 		padding: 1.5rem;

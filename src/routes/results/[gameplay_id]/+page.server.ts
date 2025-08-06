@@ -64,22 +64,24 @@ export async function load({ platform, params, cookies, url }) {
 		gameplay.json = { times };
 	}
 
-	const [todaysResultsQuery, { avg_time: userWeeklyAverage }] = await Promise.all([
+	const fiftyTwoWeeksAgo = new Date(gameplay.day).setUTCDate(
+		// 52 weeeks ago, adjusted to the start of that week (Sunday)
+		new Date(gameplay.day).getUTCDate() - new Date(gameplay.day).getUTCDay() - 52 * 7,
+	);
+	const [todaysResultsQuery, userResultsQuery] = await Promise.all([
 		D1.prepare(
 			`SELECT * FROM gameplay WHERE day = ? AND time IS NOT NULL AND time >= 5000 AND time <= 600000 ORDER BY ended_at DESC LIMIT 200`,
 		)
 			.bind(gameplay.day)
 			.all<GamePlay>(),
-		D1.prepare(
-			`SELECT AVG(time) as avg_time FROM gameplay WHERE user_uuid = ? AND day <= ? AND day >= ? AND time IS NOT NULL`,
-		)
-			.bind(gameplay.user_uuid, gameplay.day, gameplay.day - 7 * 86400000) // 7 days in milliseconds
-			.first<{ avg_time: number }>()
-			.then((res) => res || { avg_time: null }),
+		D1.prepare(`SELECT time, day FROM gameplay WHERE user_uuid = ? AND day <= ? AND day >= ?`)
+			.bind(gameplay.user_uuid, gameplay.day, fiftyTwoWeeksAgo)
+			.all<Pick<GamePlay, 'time' | 'day'>>(),
 	]);
-	if (!todaysResultsQuery.success) {
+	if (!todaysResultsQuery.success || !userResultsQuery.success) {
 		throw error(500, { message: 'Failed to fetch results' });
 	}
+	const userResults = [...userResultsQuery.results.sort((a, b) => b.day - a.day)];
 	const todaysResults = todaysResultsQuery.results;
 	const averageForDay =
 		todaysResults.reduce((acc, curr) => acc + Math.min(180000, curr.time || 0), 0) /
@@ -101,11 +103,35 @@ export async function load({ platform, params, cookies, url }) {
 		.map((result) => result.time || 0)
 		.reduce((min, curr) => (curr < min ? curr : min), gameplay.time || Infinity);
 
+	const userWeeklyAverageResults = userResults.filter(
+		(result) => result.time && result.day >= gameplay.day - 7 * 86400000,
+	);
+	const userWeeklyAverage =
+		userWeeklyAverageResults.reduce((acc, curr) => acc + Math.min(180000, curr.time || 0), 0) /
+		(userWeeklyAverageResults.length || 1);
+
+	let userStreak = 0;
+	for (const { time, day } of userResults) {
+		if (time && day === gameplay.day - 86400000 * userStreak) {
+			userStreak++;
+		} else {
+			break;
+		}
+	}
+
 	return {
 		day: gameplay.day,
 		word: gameplay.word,
 		time: gameplay.time || 0,
 		userWeeklyAverage,
+		userStreak,
+		userHistory: userResults.reduce(
+			(acc, curr) => {
+				acc[`${curr.day}`] = curr.time ?? null;
+				return acc;
+			},
+			{} as Record<string, number | null>,
+		),
 		averageForDay,
 		fastestTime,
 		numHintsUsed: gameplay.num_hints || 0,
