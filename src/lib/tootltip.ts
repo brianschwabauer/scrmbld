@@ -44,6 +44,29 @@ export const tooltip: Action<HTMLElement, string> = (parent, tooltipMessage) => 
 		if (e.key === 'Escape') hideTooltip();
 	}
 
+	function hideAllOtherTooltips() {
+		const tooltips = document.querySelectorAll<HTMLElement>('[role="tooltip"]');
+		for (const tooltip of tooltips) {
+			if (tooltip !== el) {
+				tooltip.style.transform = 'scale(.65)';
+				tooltip.style.opacity = '0';
+			}
+		}
+	}
+
+	function handleClick(e: MouseEvent) {
+		if (!('pointerType' in e) || e.pointerType !== 'touch') return;
+		if (el && el.style.opacity === '1') {
+			hideTooltip();
+		} else {
+			createTooltip();
+			clearTimeout(showTimer);
+			clearTimeout(hideTimer);
+			hideAllOtherTooltips();
+			setTimeout(() => showTooltip(), 0);
+		}
+	}
+
 	async function createTooltip() {
 		if (el) return;
 		el = document.createElement('div');
@@ -68,7 +91,7 @@ export const tooltip: Action<HTMLElement, string> = (parent, tooltipMessage) => 
 			'max-width': 'min(40ch, 90vw)',
 			'border-radius': '10px',
 			'font-size': '90%',
-			'line-height': '1.3'
+			'line-height': '1.3',
 		});
 		let portal = document.querySelector('#tooltips');
 		if (!portal) {
@@ -85,17 +108,20 @@ export const tooltip: Action<HTMLElement, string> = (parent, tooltipMessage) => 
 			const { placement, x, y } = await computePosition(parent, el, {
 				placement: 'top',
 				strategy: 'absolute',
-				middleware: [offset(8), flip(), shift()]
+				middleware: [offset(8), flip(), shift()],
 			});
 			Object.assign(el.style, {
 				left: `${x}px`,
 				top: `${y}px`,
-				'transform-origin': `${placement === 'top' ? 'bottom' : 'top'} center`
+				'transform-origin': `${placement === 'top' ? 'bottom' : 'top'} center`,
 			});
 		});
 	}
 
 	function startListening() {
+		if (parent.tagName !== 'BUTTON' && parent.tagName !== 'A') {
+			parent.addEventListener('click', handleClick);
+		}
 		parent.addEventListener('pointerenter', delayShowTooltip);
 		parent.addEventListener('pointerleave', delayHideTooltip);
 		parent.addEventListener('focus', delayShowTooltip);
@@ -104,6 +130,7 @@ export const tooltip: Action<HTMLElement, string> = (parent, tooltipMessage) => 
 	}
 	function destroy() {
 		destroyed = true;
+		parent.removeEventListener('click', handleClick);
 		parent.removeEventListener('pointerenter', delayShowTooltip);
 		parent.removeEventListener('pointerleave', delayHideTooltip);
 		parent.removeEventListener('focus', delayShowTooltip);
@@ -128,6 +155,6 @@ export const tooltip: Action<HTMLElement, string> = (parent, tooltipMessage) => 
 				el.innerText = message;
 			}
 		},
-		destroy
+		destroy,
 	};
 };
