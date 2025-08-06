@@ -66,7 +66,7 @@ export async function load({ platform, params, cookies, url }) {
 
 	const [todaysResultsQuery, { avg_time: userWeeklyAverage }] = await Promise.all([
 		D1.prepare(
-			`SELECT * FROM gameplay WHERE day = ? AND time IS NOT NULL AND time >= 15000 AND time <= 600000 ORDER BY ended_at DESC LIMIT 200`,
+			`SELECT * FROM gameplay WHERE day = ? AND time IS NOT NULL AND time >= 5000 AND time <= 600000 ORDER BY ended_at DESC LIMIT 200`,
 		)
 			.bind(gameplay.day)
 			.all<GamePlay>(),
@@ -84,6 +84,7 @@ export async function load({ platform, params, cookies, url }) {
 	const averageForDay =
 		todaysResults.reduce((acc, curr) => acc + Math.min(180000, curr.time || 0), 0) /
 			todaysResults.length || 0;
+	const LIMIT_RESULTS_TO_STANDARD_DEVIATION = false; // Whether to limit results to within a certain standard deviation
 	const STANDARD_DEVIATION_THRESHOLD = 1.5; // Number of standard deviations to filter by. Lower values include less results.
 	const standardDeviation = Math.sqrt(
 		todaysResults.reduce((acc, curr) => acc + Math.pow((curr.time || 0) - averageForDay, 2), 0) /
@@ -93,8 +94,9 @@ export async function load({ platform, params, cookies, url }) {
 		.filter(
 			(result) =>
 				result.time &&
-				result.time >= averageForDay - STANDARD_DEVIATION_THRESHOLD * standardDeviation &&
-				result.time <= averageForDay + STANDARD_DEVIATION_THRESHOLD * standardDeviation,
+				(!LIMIT_RESULTS_TO_STANDARD_DEVIATION ||
+					(result.time >= averageForDay - STANDARD_DEVIATION_THRESHOLD * standardDeviation &&
+						result.time <= averageForDay + STANDARD_DEVIATION_THRESHOLD * standardDeviation)),
 		)
 		.map((result) => result.time || 0)
 		.reduce((min, curr) => (curr < min ? curr : min), gameplay.time || Infinity);
