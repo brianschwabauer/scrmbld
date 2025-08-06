@@ -209,7 +209,7 @@
 		</div>
 		<div class="detail">
 			{#if data.isCurrentUser}
-				<span class="label">My Steak</span>
+				<span class="label">My Streak</span>
 			{:else}
 				<span class="label">Friend's Streak</span>
 			{/if}
