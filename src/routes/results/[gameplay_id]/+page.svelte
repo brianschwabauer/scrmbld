@@ -3,6 +3,7 @@
 	import { goto } from '$app/navigation';
 	import { assets } from '$app/paths';
 	import { page } from '$app/state';
+	import Expand from '$lib/Expand.svelte';
 	import FlipText from '$lib/FlipText.svelte';
 	import Popover from '$lib/Popover.svelte';
 	import { ripple } from '$lib/ripple';
@@ -14,6 +15,7 @@
 	const copiedTextToClipboard = new SvelteSet<string>();
 	let shareButtonEl = $state<HTMLButtonElement | undefined>(undefined);
 	let showConfetti = $state(false);
+	let viewDetailedResults = $state(false);
 	const useNativeShare = $derived(
 		browser &&
 			typeof navigator !== undefined &&
@@ -152,33 +154,41 @@
 	></FlipText>
 
 	<div class="details">
-		<div class="detail">
-			<span class="label">Today</span>
-			<FlipText
-				word={new Date(data.day).toLocaleDateString(undefined, {
-					timeZone: 'UTC',
-					dateStyle: 'short',
-				})}
-				alphabet={[
-					'',
-					'@',
-					'#',
-					'+',
-					'=',
-					'?',
-					':',
-					...Array.from({ length: 10 }, (_, i) => String.fromCharCode(48 + i)),
-					'/',
-				]}
-				minLength={0}
-				duration={300}
-			></FlipText>
-		</div>
-		{#if data.isCurrentUser}
-			<div class="detail">
-				<span class="label">Word</span>
-				<FlipText word={data.word} minLength={0} duration={300}></FlipText>
+		<Expand show={viewDetailedResults}>
+			<div style="margin-right: -2px;">
+				<div class="detail" style="padding: 3px 2px;">
+					<span class="label">Today</span>
+					<FlipText
+						word={new Date(data.day).toLocaleDateString(undefined, {
+							timeZone: 'UTC',
+							dateStyle: 'short',
+						})}
+						alphabet={[
+							'',
+							'@',
+							'#',
+							'+',
+							'=',
+							'?',
+							':',
+							...Array.from({ length: 10 }, (_, i) => String.fromCharCode(48 + i)),
+							'/',
+						]}
+						minLength={0}
+						duration={300}
+					></FlipText>
+				</div>
 			</div>
+		</Expand>
+		{#if data.isCurrentUser}
+			<Expand show={viewDetailedResults}>
+				<div style="margin-right: -2px;">
+					<div class="detail" style="padding: 3px 2px;">
+						<span class="label">Word</span>
+						<FlipText word={data.word} minLength={0} duration={300}></FlipText>
+					</div>
+				</div>
+			</Expand>
 		{/if}
 		<div class="detail">
 			<span class="label">Today's Average</span>
@@ -219,51 +229,64 @@
 	</div>
 
 	{#if data.userHistory}
-		<div class="streak">
-			{#each { length: numStreakWeeks } as _, i}
-				<div class="week">
-					{#each { length: 7 } as _, j}
-						{@const dayOfWeek = new Date(data.day).getUTCDay()}
-						{@const day = data.day - (dayOfWeek - 6 + (i * 7 + j)) * 24 * 60 * 60 * 1000}
-						{@const result = data.userHistory[`${day}`]}
-						{@const date = new Date(day).toLocaleDateString(undefined, {
-							timeZone: 'UTC',
-							dateStyle: 'short',
-						})}
-						<span
-							class="day"
-							class:today={day === data.day}
-							class:future={day > data.day}
-							class:success={!!result}
-							class:attempted={result !== undefined}
-							use:tooltip={result === undefined
-								? date
-								: result
-									? `${date} - Solved in ${getTimeDisplay(result)}`
-									: `${date} - Failed to solve`}
-						>
-							<!-- {#if j === 0}
-								S
-							{:else if j === 1}
-								F
-							{:else if j === 2}
-								T
-							{:else if j === 3}
-								W
-							{:else if j === 4}
-								T
-							{:else if j === 5}
-								M
-							{:else if j === 6}
-								S
-							{/if} -->
-						</span>
+		<Expand show={viewDetailedResults}>
+			<div>
+				<div class="streak">
+					{#each { length: numStreakWeeks } as _, i}
+						<div class="week">
+							{#each { length: 7 } as _, j}
+								{@const dayOfWeek = new Date(data.day).getUTCDay()}
+								{@const day = data.day - (dayOfWeek - 6 + (i * 7 + j)) * 24 * 60 * 60 * 1000}
+								{@const result = data.userHistory[`${day}`]}
+								{@const date = new Date(day).toLocaleDateString(undefined, {
+									timeZone: 'UTC',
+									dateStyle: 'short',
+								})}
+								<span
+									class="day"
+									class:today={day === data.day}
+									class:future={day > data.day}
+									class:success={!!result}
+									class:attempted={result !== undefined}
+									use:tooltip={result === undefined
+										? date
+										: result
+											? `${date} - Solved in ${getTimeDisplay(result)}`
+											: `${date} - Failed to solve`}
+								>
+									<!-- {#if j === 0}
+									S
+								{:else if j === 1}
+									F
+								{:else if j === 2}
+									T
+								{:else if j === 3}
+									W
+								{:else if j === 4}
+									T
+								{:else if j === 5}
+									M
+								{:else if j === 6}
+									S
+								{/if} -->
+								</span>
+							{/each}
+						</div>
 					{/each}
 				</div>
-			{/each}
-		</div>
+			</div>
+		</Expand>
 	{/if}
 
+	<Expand show={!viewDetailedResults}>
+		<div>
+			<button
+				class="button"
+				style="margin-bottom: 1rem;"
+				onclick={() => (viewDetailedResults = true)}>View Detailed Results</button
+			>
+		</div>
+	</Expand>
 	{#if !data.isCurrentUser}
 		<p style="max-width: 350px; text-align: center; margin: 1rem auto 1.5rem; text-wrap: balance;">
 			Now it's <i>your</i> turn. Find the 7 letter word in 8 scrambled letters.
@@ -427,12 +450,13 @@
 		display: flex;
 		flex-direction: column;
 		align-items: flex-end;
-		gap: 1rem;
+		gap: 0;
 		margin: 2rem 0 2rem;
 		.detail {
 			display: flex;
 			align-items: center;
 			gap: 1rem;
+			margin-top: 1rem;
 			:global(.flip-text) {
 				display: inline-flex;
 			}
@@ -458,6 +482,8 @@
 		font-optical-sizing: auto;
 		font-weight: 400;
 		font-style: normal;
+		width: calc(100vw - 2rem);
+		max-width: 400px;
 		&:disabled {
 			opacity: 0.65;
 			cursor: not-allowed;
@@ -480,7 +506,7 @@
 		align-items: center;
 		flex-direction: row-reverse;
 		justify-content: center;
-		width: calc(100% - 1rem);
+		width: calc(100vw - 1rem);
 		max-width: 700px;
 		gap: 2px;
 		padding: 0 1rem;
@@ -495,7 +521,7 @@
 			max-width: 25px;
 		}
 		.day {
-			aspect-ratio: 0.8;
+			aspect-ratio: 0.9;
 			background-color: #5c5c5c;
 			width: 100%;
 			border-radius: 10%;
