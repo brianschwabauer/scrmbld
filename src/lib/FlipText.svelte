@@ -35,6 +35,8 @@
 			...Array.from({ length: 26 }, (_, i) => String.fromCharCode(65 + i)),
 			' ',
 		],
+		/** The callback for when one of the flip text characters is clicked */
+		onclick = undefined as ((index: number) => void) | undefined,
 	} = $props();
 	const MAX_LETTER_ELEMENTS = 10; // max number of letter elements to display. lower this to improve performance
 	const DURATION = $derived(duration);
@@ -219,7 +221,11 @@
 	class:error
 >
 	{#each new Array(Math.max(minLength, letters.length)) as _, i (i)}
-		<div
+		<svelte:element
+			this={onclick ? 'button' : 'div'}
+			role={onclick ? 'button' : undefined}
+			onclick={() => onclick?.(i)}
+			disabled={onclick && usedLetters?.has(i) ? true : undefined}
 			class="letters"
 			class:used={usedLetters?.has(i)}
 			class:selected={Math.abs(selectionEnd - selectionStart) >= 1
@@ -230,7 +236,7 @@
 				<div class="part top"></div>
 				<div class="part bottom"></div>
 			{/each}
-		</div>
+		</svelte:element>
 	{/each}
 </div>
 
@@ -282,6 +288,19 @@
 				}
 			}
 		}
+		button.letters:not(:disabled) {
+			cursor: pointer;
+			&:hover {
+				color: #ffffff;
+				transition: scale 100ms ease;
+				.part {
+					&:global(::after) {
+						opacity: 1;
+						transition: none;
+					}
+				}
+			}
+		}
 		.letters {
 			display: grid;
 			grid-template-columns: 1fr;
@@ -290,12 +309,27 @@
 			user-select: none;
 			color: #dddddd;
 			position: relative;
+			background-color: transparent;
 			--gap: max(2px, 0.045em);
 			box-shadow:
 				1px 1px 1px 0px rgba(0, 0, 0, 0.8),
 				2px 2px 4px 0px rgba(0, 0, 0, 0.25);
 			border-radius: 0.05em;
 			contain: content;
+			margin: 0;
+			padding: 0;
+			border: none;
+			outline: none;
+			-webkit-tap-highlight-color: transparent;
+			font-size: 1em;
+			font-family: 'Roboto Mono', monospace;
+			font-weight: 500;
+			transition:
+				color 300ms ease,
+				scale 100ms ease;
+			&:active:not(:disabled):not(.used) {
+				scale: 0.95;
+			}
 			&::after {
 				content: '';
 				position: absolute;
@@ -330,6 +364,15 @@
 				border-radius: 2px;
 				&:global(::before) {
 					content: var(--letter, ' ');
+				}
+				&:global(::after) {
+					content: '';
+					position: absolute;
+					inset: 0;
+					background-color: rgb(255 255 255 / 0.1);
+					opacity: 0;
+					pointer-events: none;
+					transition: opacity 300ms ease;
 				}
 				&.top {
 					--clip: calc(50% - var(--gap) / 2);

@@ -7,8 +7,8 @@
 	import Keyboard from '$lib/Keyboard.svelte';
 	import { ripple } from '$lib/ripple';
 	import { untrack } from 'svelte';
-	import { quartInOut } from 'svelte/easing';
-	import { type TransitionConfig } from 'svelte/transition';
+	import { backIn, quartInOut, quartOut } from 'svelte/easing';
+	import { slide, type TransitionConfig } from 'svelte/transition';
 	import type { GamePlay } from '../api/gameplay/gameplay.type';
 
 	const { data } = $props();
@@ -168,15 +168,6 @@
 			},
 		};
 	}
-
-	// Focus the input element to open up the keyboard on mobile
-	$effect(() => {
-		if (!inputEl) return;
-		setTimeout(() => {
-			if (!inputEl) return;
-			inputEl.focus();
-		}, 2500);
-	});
 
 	$effect(() => {
 		if (success) return;
@@ -382,9 +373,6 @@
 			}}
 		/>
 	</div>
-	<div class="question">
-		<FlipText word={scrambled} {usedLetters} duration={350} />
-	</div>
 	<div class="actions">
 		{#if success && !alreadySolved}
 			<div style="height: 3.5rem; display: flex; align-items: center; text-align: center;">
@@ -395,7 +383,6 @@
 				disabled={shuffling}
 				onclick={() => {
 					scrambled = shuffle();
-					if (inputEl) inputEl.focus();
 				}}
 				use:ripple>Shuffle</button
 			>
@@ -429,7 +416,6 @@
 			<button
 				onclick={() => {
 					applyHint();
-					if (inputEl) inputEl.focus();
 				}}
 				use:ripple
 				class="hint"
@@ -447,17 +433,53 @@
 			</button>
 		{/if}
 	</div>
-	<Keyboard
-		onclick={(key) => {
-			if (key === 'Clear') {
-				attempt = '';
-				selectionStart = 0;
-				selectionEnd = 0;
-				return;
-			}
-			window.dispatchEvent(new KeyboardEvent('keyup', { key, detail: 1 }));
-		}}
-	></Keyboard>
+	<div class="question">
+		<FlipText
+			word={scrambled}
+			{usedLetters}
+			duration={350}
+			onclick={(i) => {
+				if (usedLetters.has(i)) return;
+				if (attempt.length >= answer.length) return;
+				const letter = scrambled[i];
+				usedLetters.add(i);
+				attempt += letter;
+				setTimeout(() => {
+					if (inputEl) {
+						selectionStart = attempt.length;
+						selectionEnd = selectionStart;
+						inputEl.setSelectionRange(selectionStart, selectionEnd);
+					}
+				}, 0);
+			}}
+		/>
+	</div>
+
+	{#if attempt.length > hintLetters}
+		<button
+			class="clear"
+			in:slide={{ axis: 'y', easing: quartOut, duration: 300 }}
+			out:slide={{ axis: 'y', easing: backIn, duration: 150 }}
+			onpointerdown={() => {
+				attempt = hintLetters ? answer.slice(0, hintLetters) : '';
+			}}
+			use:ripple>Clear</button
+		>
+	{/if}
+
+	<div class="desktop-only" style="margin-top: 1rem;">
+		<Keyboard
+			onclick={(key) => {
+				if (key === 'Clear') {
+					attempt = '';
+					selectionStart = 0;
+					selectionEnd = 0;
+					return;
+				}
+				window.dispatchEvent(new KeyboardEvent('keyup', { key, detail: 1 }));
+			}}
+		></Keyboard>
+	</div>
 </article>
 
 <style lang="scss">
@@ -468,7 +490,7 @@
 		max-width: 100vw;
 		overflow: hidden;
 		min-height: 100vh;
-		padding: 5rem 0 4rem;
+		padding: 8svh 0 6vh;
 		@media (min-width: 768px) {
 			justify-content: center;
 			padding: 0;
@@ -478,6 +500,12 @@
 				position: fixed;
 				bottom: 4rem;
 			}
+		}
+	}
+	.desktop-only {
+		display: none;
+		@media (min-width: 769px) and (min-height: 700px) {
+			display: block;
 		}
 	}
 	.already-solved {
@@ -500,8 +528,7 @@
 		justify-content: center;
 		align-items: center;
 		gap: 1rem;
-		margin-top: 2rem;
-		margin-bottom: 4rem;
+		margin: 4svh 0;
 	}
 	.hint {
 		display: flex;
@@ -605,26 +632,44 @@
 			font-size: 1rem;
 		}
 	}
+	.clear {
+		position: fixed;
+		bottom: 1rem;
+		background-color: rgba(255, 255, 255, 0.05);
+		color: #dddddd;
+		padding: 0.5rem 1rem;
+		border-radius: 999px;
+		text-decoration: none;
+		font-size: 2rem;
+		font-weight: 500;
+		text-align: center;
+		text-wrap: pretty;
+		z-index: 1;
+		width: calc(100vw - 2rem);
+		backdrop-filter: blur(10px);
+		@media (min-width: 769px) {
+			display: none;
+		}
+	}
 	.question {
 		display: flex;
 		flex-direction: column;
 		gap: 1rem;
-		font-size: 0.9rem;
-		@media (min-width: 350px) {
-			font-size: 1.35rem;
-		}
-		@media (min-width: 400px) {
-			font-size: 1.5rem;
-		}
-		@media (min-width: 600px) {
-			font-size: 2rem;
-			margin-bottom: 2rem;
-		}
-		@media (min-width: 1200px) and (min-height: 700px) {
-			font-size: 3rem;
-		}
-		@media (min-width: 1600px) and (min-height: 800px) {
-			font-size: 3.5rem;
+		font-size: min(7vmin, 5rem);
+		margin-bottom: 2rem;
+
+		@media (max-width: 768px) {
+			margin-bottom: 0;
+			:global(.flip-text) {
+				display: grid;
+				grid-template-columns: repeat(4, 1fr);
+				grid-template-rows: repeat(2, auto);
+				font-size: 13vmin;
+				margin-top: 2vh;
+			}
+			:global(.flip-text > button) {
+				justify-items: center;
+			}
 		}
 	}
 	.answer {
@@ -632,25 +677,7 @@
 		grid-template-columns: 1fr;
 		grid-template-rows: 1fr;
 		font-size: 1.25rem;
-		margin-bottom: 1.5rem;
-		@media (min-width: 300px) {
-			font-size: 1.5rem;
-		}
-		@media (min-width: 350px) {
-			font-size: 1.75rem;
-		}
-		@media (min-width: 400px) {
-			font-size: 2rem;
-		}
-		@media (min-width: 600px) {
-			font-size: 3rem;
-		}
-		@media (min-width: 1200px) and (min-height: 700px) {
-			font-size: 4rem;
-		}
-		@media (min-width: 1600px) and (min-height: 800px) {
-			font-size: 4.5rem;
-		}
+		font-size: min(7vmin, 5rem);
 		:global(.flip-text) {
 			grid-row: 1 / 1;
 			grid-column: 2 / 2;
