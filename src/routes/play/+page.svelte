@@ -2,6 +2,7 @@
 <script lang="ts">
 	import { browser } from '$app/environment';
 	import { assets } from '$app/paths';
+	import { initAudioContext, playTick, playSwoosh } from '$lib/audio';
 	import { randomNumberGenerator } from '$lib';
 	import FlipText from '$lib/FlipText.svelte';
 	import Keyboard from '$lib/Keyboard.svelte';
@@ -66,31 +67,18 @@
 	const numHintsUsed = $derived(
 		Math.max(0, Math.min(7, todaysWord.word.slice(1).length - mixletters.length + hintLetters)),
 	);
-	const audioEffects = browser
-		? [{ start: 0, end: 2.5, audio: new Audio(`${assets}/splitflap.mp3`) }]
-		: [];
-	audioEffects.forEach((effect) => effect.audio.load());
-	function playSoundEffect(effect: number) {
-		if (!audioEffects[effect]) return;
-		const audio = audioEffects[effect].audio;
-		const isPlaying =
-			audio.currentTime > 0 && !audio.paused && !audio.ended && audio.readyState > 2;
-		if (isPlaying) return;
-		audio.currentTime = audioEffects[effect].start;
-		audio.play();
-		const cb = () => {
-			if (audio.currentTime >= audioEffects[effect].end) {
-				audio.pause();
-				audio.removeEventListener('timeupdate', cb);
-			}
-		};
-		audio.addEventListener('timeupdate', cb);
-	}
-	$effect(() => playSoundEffect(0));
+	$effect(() => {
+		if (browser) {
+			document.addEventListener('click', initAudioContext, { once: true });
+			document.addEventListener('keydown', initAudioContext, { once: true });
+		}
+	});
 
 	function shuffle(playSound = true) {
 		shuffling = true;
-		if (playSound) playSoundEffect(0);
+		if (playSound) {
+			playSwoosh();
+		}
 		setTimeout(() => {
 			shuffling = false;
 		}, 1500);
@@ -307,7 +295,11 @@
 
 <svelte:window onkeyup={onWindowKeyUp} />
 
-<article>
+<article
+	onpointerdown={() => {
+		initAudioContext();
+	}}
+>
 	{#if alreadySolved}
 		<a class="already-solved" href="/results/{gameplayID}" data-sveltekit-reload
 			>You've already solved today's word. Click to view results.</a
@@ -319,6 +311,7 @@
 				class="hint"
 				word={answer.slice(0, hintLetters)}
 				duration={wasKeyboardInput ? 100 : 150}
+				onflip={playTick}
 				success
 				minLength={hintLetters}
 			/>
@@ -326,6 +319,7 @@
 		<FlipText
 			word={attempt.slice(hintLetters)}
 			duration={wasKeyboardInput ? 100 : 150}
+			onflip={playTick}
 			{selectionEnd}
 			{selectionStart}
 			{success}
@@ -391,6 +385,7 @@
 					word={timeDisplay}
 					minLength={4}
 					duration={200}
+					onflip={playTick}
 					alphabet={[
 						'',
 						'@',
@@ -438,6 +433,7 @@
 			word={scrambled}
 			{usedLetters}
 			duration={350}
+			onflip={playTick}
 			onclick={(i) => {
 				if (usedLetters.has(i)) return;
 				if (attempt.length >= answer.length) return;

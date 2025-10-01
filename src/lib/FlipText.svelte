@@ -37,6 +37,8 @@
 		],
 		/** The callback for when one of the flip text characters is clicked */
 		onclick = undefined as ((index: number) => void) | undefined,
+		/** The callback for when a letter is flipped */
+		onflip = undefined as (() => void) | undefined,
 	} = $props();
 	const MAX_LETTER_ELEMENTS = 10; // max number of letter elements to display. lower this to improve performance
 	const DURATION = $derived(duration);
@@ -200,6 +202,9 @@
 
 			// Wait for the staggering delay before potentially initiating the next flap animation
 			await new Promise((r) => setTimeout(r, STAGGER));
+
+			// Play the flip sound
+			onflip?.();
 		}
 	}
 

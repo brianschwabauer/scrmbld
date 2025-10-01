@@ -3,6 +3,7 @@
 	import { browser } from '$app/environment';
 	import { assets } from '$app/paths';
 	import { randomNumberGenerator } from '$lib';
+	import { initAudioContext, playSwoosh, playTick } from '$lib/audio.js';
 	import FlipText from '$lib/FlipText.svelte';
 	import Keyboard from '$lib/Keyboard.svelte';
 	import Popover from '$lib/Popover.svelte';
@@ -109,31 +110,16 @@
 		}, 5000);
 	}
 
-	const audioEffects = browser
-		? [{ start: 0, end: 2.5, audio: new Audio(`${assets}/splitflap.mp3`) }]
-		: [];
-	audioEffects.forEach((effect) => effect.audio.load());
-	function playSoundEffect(effect: number) {
-		if (!audioEffects[effect]) return;
-		const audio = audioEffects[effect].audio;
-		const isPlaying =
-			audio.currentTime > 0 && !audio.paused && !audio.ended && audio.readyState > 2;
-		if (isPlaying) return;
-		audio.currentTime = audioEffects[effect].start;
-		audio.play();
-		const cb = () => {
-			if (audio.currentTime >= audioEffects[effect].end) {
-				audio.pause();
-				audio.removeEventListener('timeupdate', cb);
-			}
-		};
-		audio.addEventListener('timeupdate', cb);
-	}
-	$effect(() => playSoundEffect(0));
+	$effect(() => {
+		if (browser) {
+			document.addEventListener('click', initAudioContext, { once: true });
+			document.addEventListener('keydown', initAudioContext, { once: true });
+		}
+	});
 
 	function shuffle(playSound = true) {
 		shuffling = true;
-		if (playSound) playSoundEffect(0);
+		if (playSound) playSwoosh();
 		setTimeout(() => {
 			shuffling = false;
 		}, 1500);
@@ -288,14 +274,18 @@
 	</div>
 {/if}
 
-<article>
+<article
+	onpointerdown={() => {
+		initAudioContext();
+	}}
+>
 	<div class="answer" bind:this={answerEl}>
 		{#if hintLetters}
 			<FlipText
 				class="hint"
 				word={answer.slice(0, hintLetters)}
 				duration={wasKeyboardInput ? 100 : 150}
-				onlyAnimateOneLetter={wasKeyboardInput}
+				onflip={playTick}
 				success
 				minLength={hintLetters}
 			/>
@@ -303,9 +293,9 @@
 		<FlipText
 			word={attempt.slice(hintLetters)}
 			duration={wasKeyboardInput ? 100 : 150}
+			onflip={playTick}
 			{selectionEnd}
 			{selectionStart}
-			onlyAnimateOneLetter={wasKeyboardInput}
 			{success}
 			error={attempt.length === answer.length && !success}
 			minLength={answer.length - hintLetters}
@@ -352,7 +342,7 @@
 		/>
 	</div>
 	<div class="question">
-		<FlipText word={scrambled} {usedLetters} duration={350} minLength={5} />
+		<FlipText word={scrambled} {usedLetters} duration={350} minLength={5} onflip={playTick} />
 	</div>
 	<div class="actions">
 		{#if success}
@@ -380,6 +370,7 @@
 				word={timeDisplay}
 				minLength={4}
 				duration={200}
+				onflip={playTick}
 				alphabet={[
 					'',
 					'@',
