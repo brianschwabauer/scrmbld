@@ -476,15 +476,40 @@
 	</div>
 
 	{#if attempt.length > hintLetters}
-		<button
-			class="clear"
-			in:slide={{ axis: 'y', easing: quartOut, duration: 300 }}
-			out:slide={{ axis: 'y', easing: backIn, duration: 150 }}
-			onpointerdown={() => {
-				attempt = hintLetters ? answer.slice(0, hintLetters) : '';
-			}}
-			use:ripple>Clear</button
-		>
+		<div class="bottom-actions">
+			<button
+				in:slide={{ axis: 'y', easing: quartOut, duration: 300 }}
+				out:slide={{ axis: 'y', easing: backIn, duration: 150 }}
+				onpointerdown={() => {
+					attempt = attempt.slice(0, -1);
+				}}
+				use:ripple
+			>
+				<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
+					><path
+						fill="currentColor"
+						d="m11.4 16l2.6-2.6l2.6 2.6l1.4-1.4l-2.6-2.6L18 9.4L16.6 8L14 10.6L11.4 8L10 9.4l2.6 2.6l-2.6 2.6zM9 20q-.475 0-.9-.213t-.7-.587L2 12l5.4-7.2q.275-.375.7-.587T9 4h11q.825 0 1.413.587T22 6v12q0 .825-.587 1.413T20 20z"
+					/></svg
+				>
+				Backspace
+			</button>
+			<button
+				in:slide={{ axis: 'y', easing: quartOut, duration: 300 }}
+				out:slide={{ axis: 'y', easing: backIn, duration: 150 }}
+				onpointerdown={() => {
+					attempt = hintLetters ? answer.slice(0, hintLetters) : '';
+				}}
+				use:ripple
+			>
+				<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
+					><path
+						fill="currentColor"
+						d="m8.4 17l3.6-3.6l3.6 3.6l1.4-1.4l-3.6-3.6L17 8.4L15.6 7L12 10.6L8.4 7L7 8.4l3.6 3.6L7 15.6zm3.6 5q-2.075 0-3.9-.788t-3.175-2.137T2.788 15.9T2 12t.788-3.9t2.137-3.175T8.1 2.788T12 2t3.9.788t3.175 2.137T21.213 8.1T22 12t-.788 3.9t-2.137 3.175t-3.175 2.138T12 22"
+					/></svg
+				>
+				Clear
+			</button>
+		</div>
 	{/if}
 
 	<div class="desktop-only" style="margin-top: 1rem;">
@@ -652,23 +677,44 @@
 			font-size: 1rem;
 		}
 	}
-	.clear {
+	.bottom-actions {
 		position: fixed;
-		bottom: 1rem;
-		background-color: rgba(255, 255, 255, 0.05);
-		color: #dddddd;
-		padding: 0.5rem 1rem;
-		border-radius: 999px;
-		text-decoration: none;
-		font-size: 2rem;
-		font-weight: 500;
-		text-align: center;
-		text-wrap: pretty;
-		z-index: 1;
-		width: calc(100vw - 2rem);
-		backdrop-filter: blur(10px);
+		display: flex;
+		gap: 0.5rem;
+		bottom: 0.5rem;
+		left: 0.5rem;
+		right: 0.5rem;
 		@media (min-width: 769px) {
 			display: none;
+		}
+		@media (min-width: 400px) {
+			gap: 1rem;
+			bottom: 1rem;
+			left: 1rem;
+			right: 1rem;
+		}
+
+		button {
+			background-color: rgba(255, 255, 255, 0.05);
+			color: #dddddd;
+			padding: 0.75rem 0.5rem;
+			border-radius: 20px;
+			text-decoration: none;
+			font-weight: 500;
+			text-align: center;
+			text-wrap: pretty;
+			z-index: 1;
+			backdrop-filter: blur(10px);
+			width: 50%;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			gap: 0.5rem;
+			font-size: 1.2rem;
+			@media (min-width: 400px) {
+				font-size: 1.5rem;
+				padding: 0.75rem 1rem;
+			}
 		}
 	}
 	.question {
