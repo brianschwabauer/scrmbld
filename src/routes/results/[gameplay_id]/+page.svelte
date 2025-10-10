@@ -1,12 +1,9 @@
 <script lang="ts">
 	import { browser } from '$app/environment';
 	import { goto } from '$app/navigation';
-	import { assets } from '$app/paths';
 	import { page } from '$app/state';
 	import Expand from '$lib/Expand.svelte';
 	import FlipText from '$lib/FlipText.svelte';
-	import Popover from '$lib/Popover.svelte';
-	import { ripple } from '$lib/ripple';
 	import { tooltip } from '$lib/tootltip';
 	import Confetti from 'svelte-confetti';
 	import { SvelteSet } from 'svelte/reactivity';
@@ -63,33 +60,32 @@
 		return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 	}
 
-	function openNativeShare() {
+	function openNativeShare(text?: string, url?: string) {
 		if (!useNativeShare || typeof navigator === 'undefined' || !navigator.share) return;
 		navigator.share({
 			title: '🅂🄲🅁🄼🄱🄻🄳',
-			text: shareText,
-			url: shareURL,
+			text,
+			url,
 		});
-	}
-
-	function shareOnTwitter(text = shareText, url = shareURL) {
-		const twitterUrl = new URL(`https://twitter.com/intent/tweet`);
-		twitterUrl.searchParams.set('text', text);
-		if (url) twitterUrl.searchParams.set('url', url);
-		window.open(twitterUrl.href, '_blank');
-	}
-
-	function shareOnFacebook(text = shareText, url = shareURL) {
-		const twitterUrl = new URL(`https://www.facebook.com/share.php`);
-		twitterUrl.searchParams.set('[title]', text);
-		if (url) twitterUrl.searchParams.set('u', url);
-		window.open(twitterUrl.href, '_blank');
 	}
 
 	function shareToClipboard(text = shareText) {
 		if (typeof navigator === 'undefined') return;
 		navigator.clipboard.writeText(text);
 		copiedTextToClipboard.add(text);
+	}
+
+	let clipboardTimeout: ReturnType<typeof setTimeout> | undefined;
+	function share(type: 'text' | 'url') {
+		if (useNativeShare) {
+			openNativeShare(shareText, type === 'url' ? shareURL : undefined);
+		} else {
+			shareToClipboard(type === 'text' ? shareText : shareURL);
+			if (clipboardTimeout) clearTimeout(clipboardTimeout);
+			clipboardTimeout = setTimeout(() => {
+				copiedTextToClipboard.clear();
+			}, 5000);
+		}
 	}
 
 	$effect(() => {
@@ -280,11 +276,9 @@
 
 	<Expand show={!viewDetailedResults}>
 		<div>
-			<button
-				class="button"
-				style="margin-bottom: 1rem;"
-				onclick={() => (viewDetailedResults = true)}>View Detailed Results</button
-			>
+			<button class="button" onclick={() => (viewDetailedResults = true)}>
+				Detailed Results
+			</button>
 		</div>
 	</Expand>
 	{#if !data.isCurrentUser}
@@ -294,121 +288,22 @@
 		<a class="button primary" href="/play" data-sveltekit-reload>Play</a>
 	{/if}
 	{#if data.isCurrentUser}
-		<button class="primary" onclick={openNativeShare} bind:this={shareButtonEl}>Share</button>
-		{#if !useNativeShare}
-			<Popover refElement={shareButtonEl} openOnClick>
-				<div class="share-popover">
-					<label for="share-url">Share Results URL</label>
-					<div class="share-result">
-						<input type="text" readonly value={shareURL} id="share-url" />
-						<div class="buttons">
-							<button
-								onclick={() => shareToClipboard(shareURL)}
-								aria-label="Copy share url"
-								use:tooltip={copiedTextToClipboard.has(shareURL)
-									? 'Copied url to clipboard!'
-									: 'Copy url to clipboard'}
-								use:ripple
-							>
-								{#if copiedTextToClipboard.has(shareURL)}
-									<svg
-										xmlns="http://www.w3.org/2000/svg"
-										width="1em"
-										height="1em"
-										viewBox="0 0 24 24"
-										><path
-											fill="currentColor"
-											d="m10.6 16.6l7.05-7.05l-1.4-1.4l-5.65 5.65l-2.85-2.85l-1.4 1.4zM12 22q-2.075 0-3.9-.788t-3.175-2.137T2.788 15.9T2 12t.788-3.9t2.137-3.175T8.1 2.788T12 2t3.9.788t3.175 2.137T21.213 8.1T22 12t-.788 3.9t-2.137 3.175t-3.175 2.138T12 22"
-										/></svg
-									>
-								{:else}
-									<svg
-										xmlns="http://www.w3.org/2000/svg"
-										width="1em"
-										height="1em"
-										viewBox="0 0 24 24"
-										><path
-											fill="currentColor"
-											d="M9 18q-.825 0-1.412-.587T7 16V4q0-.825.588-1.412T9 2h9q.825 0 1.413.588T20 4v12q0 .825-.587 1.413T18 18zm-4 4q-.825 0-1.412-.587T3 20V6h2v14h11v2z"
-										></path></svg
-									>
-								{/if}
-							</button>
-							<button
-								onclick={() => shareOnTwitter(shareText, shareURL)}
-								class="twitter"
-								use:tooltip={'Share url on Twitter/X'}
-								use:ripple
-							>
-								<img src="{assets}/x.svg" alt="Twitter Logo" />
-							</button>
-							<button
-								onclick={() => shareOnFacebook(shareText, shareURL)}
-								class="facebook"
-								use:tooltip={'Share url on Facebook'}
-								use:ripple
-							>
-								<img src="{assets}/facebook.png" alt="Facebook Logo" />
-							</button>
-						</div>
-					</div>
-					<label for="share-text">Share Results Text</label>
-					<div class="share-result">
-						<input type="text" readonly value={shareText} id="share-text" />
-						<div class="buttons">
-							<button
-								onclick={() => shareToClipboard(shareText)}
-								aria-label="Copy share text"
-								use:tooltip={copiedTextToClipboard.has(shareText)
-									? 'Copied score to clipboard!'
-									: 'Copy score to clipboard'}
-								use:ripple
-							>
-								{#if copiedTextToClipboard.has(shareText)}
-									<svg
-										xmlns="http://www.w3.org/2000/svg"
-										width="1em"
-										height="1em"
-										viewBox="0 0 24 24"
-										><path
-											fill="currentColor"
-											d="m10.6 16.6l7.05-7.05l-1.4-1.4l-5.65 5.65l-2.85-2.85l-1.4 1.4zM12 22q-2.075 0-3.9-.788t-3.175-2.137T2.788 15.9T2 12t.788-3.9t2.137-3.175T8.1 2.788T12 2t3.9.788t3.175 2.137T21.213 8.1T22 12t-.788 3.9t-2.137 3.175t-3.175 2.138T12 22"
-										/></svg
-									>
-								{:else}
-									<svg
-										xmlns="http://www.w3.org/2000/svg"
-										width="1em"
-										height="1em"
-										viewBox="0 0 24 24"
-										><path
-											fill="currentColor"
-											d="M9 18q-.825 0-1.412-.587T7 16V4q0-.825.588-1.412T9 2h9q.825 0 1.413.588T20 4v12q0 .825-.587 1.413T18 18zm-4 4q-.825 0-1.412-.587T3 20V6h2v14h11v2z"
-										></path></svg
-									>
-								{/if}
-							</button>
-							<button
-								onclick={() => shareOnTwitter(shareText, '')}
-								class="twitter"
-								use:tooltip={'Share score on Twitter/X'}
-								use:ripple
-							>
-								<img src="{assets}/x.svg" alt="Twitter Logo" />
-							</button>
-							<button
-								onclick={() => shareOnFacebook(shareText, '')}
-								class="facebook"
-								use:tooltip={'Share score on Facebook'}
-								use:ripple
-							>
-								<img src="{assets}/facebook.png" alt="Facebook Logo" />
-							</button>
-						</div>
-					</div>
-				</div>
-			</Popover>
-		{/if}
+		<button class="primary share" onclick={() => share('text')} bind:this={shareButtonEl}>
+			{#if copiedTextToClipboard.has(shareText)}
+				Copied to Clipboard!
+			{:else}
+				Share Score
+			{/if}
+			<small style="letter-spacing: 2px;">{shareText}</small>
+		</button>
+		<button class="share" onclick={() => share('url')} bind:this={shareButtonEl}>
+			{#if copiedTextToClipboard.has(shareURL)}
+				Copied to Clipboard!
+			{:else}
+				Share Link
+			{/if}
+			<small>{shareURL}</small>
+		</button>
 	{/if}
 </article>
 
@@ -467,11 +362,11 @@
 		-webkit-tap-highlight-color: transparent;
 		position: relative;
 		cursor: pointer;
-		font-size: 1.5rem;
+		font-size: 1.35rem;
 		text-decoration: none;
-		border-radius: 999px;
+		border-radius: 20px;
 		padding: 0.5em 1em;
-		margin: 0 0 4rem;
+		margin: 0 0 0.75rem;
 		font-weight: 500;
 		outline: none;
 		box-shadow: none;
@@ -484,6 +379,8 @@
 		font-style: normal;
 		width: calc(100vw - 2rem);
 		max-width: 400px;
+		text-align: center;
+		box-sizing: border-box;
 		&:disabled {
 			opacity: 0.65;
 			cursor: not-allowed;
@@ -497,6 +394,20 @@
 			&:hover {
 				background-color: #ffffff;
 				color: #000000;
+			}
+		}
+		&.share {
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			small {
+				width: 80%;
+				font-size: 0.8rem;
+				opacity: 0.6;
+				font-weight: normal;
+				text-overflow: ellipsis;
+				overflow: hidden;
+				white-space: nowrap;
 			}
 		}
 	}
@@ -552,82 +463,6 @@
 			&.success {
 				background-color: #00b7a1;
 				color: #ffffff;
-			}
-		}
-	}
-
-	.share-popover {
-		color: #333333;
-		padding: 1.5rem;
-		text-align: center;
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		justify-content: center;
-		@media (min-width: 600px) {
-			padding: 2rem;
-		}
-
-		label {
-			margin-bottom: 0.5rem;
-			&:not(:first-child) {
-				margin-top: 2rem;
-			}
-		}
-		.share-result {
-			display: flex;
-			flex-direction: row;
-			align-items: center;
-			gap: 0.5rem;
-			input {
-				font-size: 1.1rem;
-				width: 100%;
-				max-width: 20rem;
-				padding: 0.5rem;
-				border-radius: 0.25rem;
-				border: none;
-				background-color: #eeeeee;
-				color: #333333;
-				font-family: 'Roboto Mono', monospace;
-				font-optical-sizing: auto;
-				font-weight: 400;
-				font-style: normal;
-			}
-		}
-		.buttons {
-			display: flex;
-			align-items: center;
-			justify-content: center;
-			gap: 0.5rem;
-		}
-		button {
-			width: 2.5rem;
-			height: 2.5rem;
-			border-radius: 100%;
-			display: flex;
-			align-items: center;
-			justify-content: center;
-			padding: 0;
-			margin: 0;
-			background-color: #eeeeee;
-			color: #333333;
-			@media (min-width: 600px) {
-				width: 3rem;
-				height: 3rem;
-			}
-			svg,
-			img {
-				width: 1.5rem;
-				height: 1.5rem;
-			}
-			&.twitter {
-				background-color: black;
-			}
-			&.facebook {
-				img {
-					width: 100%;
-					height: 100%;
-				}
 			}
 		}
 	}
