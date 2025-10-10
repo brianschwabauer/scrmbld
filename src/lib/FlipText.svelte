@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
+	import { playFailureSound, playSplitFlapSound, playSuccessSound } from './audio';
 
 	const {
 		/** The word to animate */
@@ -10,6 +11,10 @@
 		duration = 300,
 		/** The number of ms between each letter flap animation */
 		stagger = undefined as number | undefined,
+		/** Whether to play sound effects when animating letters */
+		sound = false,
+		/** The volume of the sound effects, between 0 and 1 */
+		volume = 1,
 		/** The index of the start of the current selected items */
 		selectionStart = -1 as number,
 		/** The index of the end of the current selected items */
@@ -99,6 +104,18 @@
 				flapIndex: 0,
 				flapAnimations: new WeakMap<HTMLElement, Animation>(),
 			});
+		}
+
+		if (sound) {
+			const alphabetDistance =
+				lettersState.get(letterIndex)!.alphabetIndex <= alphabet.indexOf(letters[letterIndex])
+					? alphabet.indexOf(letters[letterIndex]) - lettersState.get(letterIndex)!.alphabetIndex
+					: alphabet.length -
+						lettersState.get(letterIndex)!.alphabetIndex +
+						alphabet.indexOf(letters[letterIndex]);
+			setTimeout(() => {
+				playSplitFlapSound({ ticks: Math.min(alphabetDistance, 40), delay: STAGGER + 10, volume });
+			}, 200);
 		}
 
 		// Loop until the target letter is reached for this position
@@ -202,6 +219,15 @@
 			await new Promise((r) => setTimeout(r, STAGGER));
 		}
 	}
+
+	$effect(() => {
+		if (!success || !sound) return;
+		playSuccessSound();
+	});
+	$effect(() => {
+		if (!error || !sound) return;
+		playFailureSound();
+	});
 
 	$effect(() => {
 		if (!container) return;

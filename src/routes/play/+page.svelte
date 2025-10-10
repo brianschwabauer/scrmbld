@@ -22,7 +22,7 @@
 	let inputEl = $state<HTMLInputElement | undefined>(undefined);
 	let answerEl = $state<HTMLDivElement | undefined>(undefined);
 	let shuffling = $state(false);
-	let scrambled = $state(shuffle(false));
+	let scrambled = $state(shuffle());
 	let attempt = $state('');
 	let selectionStart = $state(0);
 	let selectionEnd = $state(0);
@@ -32,6 +32,7 @@
 	let gameplayID = $state<string | undefined>(undefined);
 	let gameplayStartSaved = $state(false);
 	let gameplayEndSaved = $state(false);
+	let muted = $state(data.mutedPreference ?? false);
 	const alreadySolved = $derived(gameplayEndSaved && !!gameplayID);
 	const success = $derived(!!answer && attempt === answer);
 	const time = $derived(
@@ -75,32 +76,8 @@
 		Math.max(0, Math.min(7, todaysWord.word.slice(1).length - mixletters.length + hintLetters)),
 	);
 
-	// Sound effects
-	const audioEffects = browser
-		? [{ start: 0, end: 2.5, audio: new Audio(`${assets}/splitflap.mp3`) }]
-		: [];
-	audioEffects.forEach((effect) => effect.audio.load());
-	function playSoundEffect(effect: number) {
-		if (!audioEffects[effect]) return;
-		const audio = audioEffects[effect].audio;
-		const isPlaying =
-			audio.currentTime > 0 && !audio.paused && !audio.ended && audio.readyState > 2;
-		if (isPlaying) return;
-		audio.currentTime = audioEffects[effect].start;
-		audio.play();
-		const cb = () => {
-			if (audio.currentTime >= audioEffects[effect].end) {
-				audio.pause();
-				audio.removeEventListener('timeupdate', cb);
-			}
-		};
-		audio.addEventListener('timeupdate', cb);
-	}
-	$effect(() => playSoundEffect(0));
-
-	function shuffle(playSound = true) {
+	function shuffle() {
 		shuffling = true;
-		if (playSound) playSoundEffect(0);
 		setTimeout(() => {
 			shuffling = false;
 		}, 1500);
@@ -339,6 +316,7 @@
 				class="hint"
 				word={answer.slice(0, hintLetters)}
 				duration={wasKeyboardInput ? 100 : 150}
+				sound={!muted}
 				success
 				minLength={hintLetters}
 			/>
@@ -346,6 +324,8 @@
 		<FlipText
 			word={attempt.slice(hintLetters)}
 			duration={wasKeyboardInput ? 100 : 150}
+			sound={!muted}
+			volume={0.75}
 			{selectionEnd}
 			{selectionStart}
 			{success}
@@ -411,6 +391,8 @@
 					word={timeDisplay}
 					minLength={4}
 					duration={200}
+					sound={!muted}
+					volume={0.65}
 					alphabet={[
 						'',
 						'@',
@@ -458,6 +440,7 @@
 			word={scrambled}
 			{usedLetters}
 			duration={350}
+			sound={!muted}
 			onclick={(i) => {
 				if (usedLetters.has(i)) return;
 				if (attempt.length >= answer.length) return;
@@ -476,10 +459,12 @@
 	</div>
 
 	{#if attempt.length > hintLetters}
-		<div class="bottom-actions">
+		<div
+			class="bottom-actions"
+			in:slide={{ axis: 'y', easing: quartOut, duration: 300 }}
+			out:slide={{ axis: 'y', easing: backIn, duration: 150 }}
+		>
 			<button
-				in:slide={{ axis: 'y', easing: quartOut, duration: 300 }}
-				out:slide={{ axis: 'y', easing: backIn, duration: 150 }}
 				onpointerdown={() => {
 					attempt = attempt.slice(0, -1);
 				}}
@@ -494,8 +479,6 @@
 				Backspace
 			</button>
 			<button
-				in:slide={{ axis: 'y', easing: quartOut, duration: 300 }}
-				out:slide={{ axis: 'y', easing: backIn, duration: 150 }}
 				onpointerdown={() => {
 					attempt = hintLetters ? answer.slice(0, hintLetters) : '';
 				}}
@@ -510,6 +493,34 @@
 				Clear
 			</button>
 		</div>
+	{:else}
+		<button
+			class="mute"
+			onpointerdown={() => {
+				muted = !muted;
+				document.cookie = `scrmbld_muted=${muted}; path=/`;
+			}}
+			use:ripple
+			title={muted ? 'Unmute' : 'Mute'}
+			in:slide={{ axis: 'y', easing: quartOut, duration: 300 }}
+			out:slide={{ axis: 'y', easing: backIn, duration: 150 }}
+		>
+			{#if muted}
+				<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24"
+					><path
+						fill="currentColor"
+						d="m19.8 22.6l-3.025-3.025q-.625.4-1.325.688t-1.45.462v-2.05q.35-.125.688-.25t.637-.3L12 14.8V20l-5-5H3V9h3.2L1.4 4.2l1.4-1.4l18.4 18.4zm-.2-5.8l-1.45-1.45q.425-.775.638-1.625t.212-1.75q0-2.35-1.375-4.2T14 5.275v-2.05q3.1.7 5.05 3.138T21 11.975q0 1.325-.363 2.55T19.6 16.8m-3.35-3.35L14 11.2V7.95q1.175.55 1.838 1.65T16.5 12q0 .375-.062.738t-.188.712M12 9.2L9.4 6.6L12 4z"
+					/></svg
+				>
+			{:else}
+				<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24"
+					><path
+						fill="currentColor"
+						d="M14 20.725v-2.05q2.25-.65 3.625-2.5t1.375-4.2t-1.375-4.2T14 5.275v-2.05q3.1.7 5.05 3.138T21 11.975t-1.95 5.613T14 20.725M3 15V9h4l5-5v16l-5-5zm11 1V7.95q1.175.55 1.838 1.65T16.5 12q0 1.275-.663 2.363T14 16"
+					/></svg
+				>
+			{/if}
+		</button>
 	{/if}
 
 	<div class="desktop-only" style="margin-top: 1rem;">
@@ -681,6 +692,24 @@
 		@media (min-width: 600px) {
 			font-size: 1rem;
 		}
+	}
+	.mute {
+		position: fixed;
+		bottom: 1rem;
+		right: 1rem;
+		background-color: rgba(255, 255, 255, 0.05);
+		color: #dddddd;
+		padding: 0;
+		border-radius: 999px;
+		text-align: center;
+		z-index: 1;
+		backdrop-filter: blur(10px);
+		width: 4rem;
+		height: 4rem;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		box-sizing: border-box;
 	}
 	.bottom-actions {
 		position: fixed;

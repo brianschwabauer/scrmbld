@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { assets } from '$app/paths';
+	import { initializeAudio } from '$lib/audio';
 
 	const { children } = $props();
 </script>
@@ -14,6 +15,12 @@
 	<meta property="og:description" content="Find the 7-letter word in 8 scrambled letters" />
 	<meta property="og:site_name" content="SCRMBLD" />
 </svelte:head>
+
+<svelte:window
+	onpointerdown={() => {
+		initializeAudio();
+	}}
+/>
 
 {@render children()}
 
