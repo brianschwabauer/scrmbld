@@ -10,6 +10,7 @@
 	import { backIn, quartInOut, quartOut } from 'svelte/easing';
 	import { slide, type TransitionConfig } from 'svelte/transition';
 	import type { GamePlay } from '../api/gameplay/gameplay.type';
+	import { SvelteSet } from 'svelte/reactivity';
 
 	const { data } = $props();
 	const words = $derived(data.words);
@@ -49,23 +50,32 @@
 		}
 		return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 	});
+
+	// The indexes of the letters that have been clicked on in the scrambled word
+	// This is used to show the correct 'usedLetters' when a user clicks a second instance of a letter
+	// This isn't necessary for when the user uses the keyboard to type because we can just show the first instance as 'used'
+	const clickedLetterIndexes = new SvelteSet<number>();
+
+	// Determine the used letters based on the attempt and the scrambled word
 	const usedLetters = $derived.by(() => {
 		const letterIndexes = new Set<number>();
 		attempt.split('').forEach((letter, i) => {
-			let index: number | undefined;
-			while (index === undefined || index > -1 || index >= scrambled.length - 1) {
-				index = scrambled.indexOf(letter, (index ?? -1) + 1);
-				if (index > -1 && !letterIndexes.has(index)) {
-					letterIndexes.add(index);
-					break;
-				}
-			}
+			untrack(() => {
+				const occurrences = scrambled
+					.split('')
+					.map((l, j) => (l === letter ? j : -1))
+					.filter((j) => j > -1 && !letterIndexes.has(j))
+					.sort((a, b) => +clickedLetterIndexes.has(b) - +clickedLetterIndexes.has(a));
+				if (occurrences.length) letterIndexes.add(occurrences[0]);
+			});
 		});
 		return letterIndexes;
 	});
 	const numHintsUsed = $derived(
 		Math.max(0, Math.min(7, todaysWord.word.slice(1).length - mixletters.length + hintLetters)),
 	);
+
+	// Sound effects
 	const audioEffects = browser
 		? [{ start: 0, end: 2.5, audio: new Audio(`${assets}/splitflap.mp3`) }]
 		: [];
@@ -168,6 +178,16 @@
 			},
 		};
 	}
+
+	// Clear the clickedLetterIndexes set when letters that were previously clicked are no longer in the attempt
+	$effect(() => {
+		const attemptLength = attempt.length;
+		untrack(() => {
+			Array.from(clickedLetterIndexes).forEach((i) => {
+				if (attemptLength <= i) clickedLetterIndexes.delete(i);
+			});
+		});
+	});
 
 	$effect(() => {
 		if (success) return;
@@ -442,7 +462,7 @@
 				if (usedLetters.has(i)) return;
 				if (attempt.length >= answer.length) return;
 				const letter = scrambled[i];
-				usedLetters.add(i);
+				clickedLetterIndexes.add(i);
 				attempt += letter;
 				setTimeout(() => {
 					if (inputEl) {
