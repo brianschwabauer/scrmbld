@@ -566,6 +566,11 @@
 		text-align: center;
 		text-wrap: pretty;
 		margin: 0 1rem;
+		+ .answer {
+			@media (max-width: 768px) {
+				margin-top: 2rem;
+			}
+		}
 	}
 	.actions {
 		display: flex;
