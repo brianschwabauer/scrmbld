@@ -698,6 +698,9 @@
 		grid-template-rows: 1fr;
 		font-size: 1.25rem;
 		font-size: min(7vmin, 5rem);
+		@media (max-width: 768px) {
+			pointer-events: none;
+		}
 		:global(.flip-text) {
 			grid-row: 1 / 1;
 			grid-column: 2 / 2;
