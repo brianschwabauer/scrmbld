@@ -89,7 +89,7 @@ export function playSplitFlapSound(options?: {
 
 	if (ticks <= 0) return;
 
-	initializeAudio();
+	// initializeAudio(); // We'll initialize audio on first pointer down to comply with browser policies
 
 	if (!audioContext || !dryMixGain || !wetMixGain) {
 		console.warn('AudioContext not available. Sound cannot be played.');
@@ -187,7 +187,7 @@ export function playSplitFlapSound(options?: {
  * This sound is created by layering multiple sine waves to create rich harmonics.
  */
 export function playSuccessSound(): void {
-	initializeAudio();
+	// initializeAudio(); // We'll initialize audio on first pointer down to comply with browser policies
 	if (!audioContext || !dryMixGain || !wetMixGain) return;
 	if (audioContext.state === 'suspended') audioContext.resume();
 
@@ -233,7 +233,7 @@ export function playSuccessSound(): void {
  * Plays a more complex failure sound that sweeps down to a low thud.
  */
 export function playFailureSound(): void {
-	initializeAudio();
+	// initializeAudio(); // We'll initialize audio on first pointer down to comply with browser policies
 	if (!audioContext || !dryMixGain || !wetMixGain) return;
 	if (audioContext.state === 'suspended') audioContext.resume();
 
