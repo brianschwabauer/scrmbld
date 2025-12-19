@@ -9,7 +9,11 @@
 	</header>
 	<section>
 		<p>Find the 7 letter word in 8 scrambled letters</p>
-		<a href="/play">Play</a>
+		<div class="actions">
+			<a class="primary" href="/play">Play Now</a>
+			<a href="/help">How to Play</a>
+			<!-- <a href="/signup">Sign Up</a> -->
+		</div>
 	</section>
 </article>
 
@@ -65,21 +69,50 @@
 			font-size: 2rem;
 		}
 	}
+	.actions {
+		display: flex;
+		flex-direction: column;
+		gap: 1rem;
+		margin-top: 1rem;
+		min-width: min(80vw, 300px);
+	}
 	a {
 		cursor: pointer;
-		font-size: 2rem;
+		font-size: 1.25rem;
 		text-decoration: none;
-		border-radius: 999px;
-		background-color: #eeeeee;
-		color: #333333;
-		padding: 0.5rem 2rem;
+		border-radius: 4px;
+		padding: 0.75rem 2rem;
+		margin: 0;
 		font-weight: 500;
 		border: none;
 		outline: none;
-		box-shadow: none;
-		&:hover {
-			background-color: #ffffff;
-			color: #000000;
+		background-color: rgba(255, 255, 255, 0.05);
+		color: #dddddd;
+		transition:
+			transform 0.07s,
+			opacity 0.2s;
+		box-shadow: 0 4px 0 #333333;
+		-webkit-tap-highlight-color: transparent;
+
+		&:active {
+			transform: translateY(4px);
+			box-shadow: none;
+		}
+		&:not(.primary) {
+			&:hover {
+				background-color: rgba(255, 255, 255, 0.1);
+				color: #ffffff;
+			}
+		}
+		&.primary {
+			background-color: #eeeeee;
+			color: #333333;
+			font-size: 2rem;
+			box-shadow: 0 4px 0 #999999;
+			&:hover {
+				background-color: #ffffff;
+				color: #000000;
+			}
 		}
 	}
 </style>
