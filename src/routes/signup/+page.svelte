@@ -44,8 +44,8 @@
 		<p class="error">{errorMessage}</p>
 	{:else}
 		<p>
-			Stay informed about about our upcoming card game launch on Kickstarter, new features, and
-			special events. We respect your privacy and won't spam you.
+			Stay informed about our upcoming card game launch on Kickstarter, new features, and special
+			events. We respect your privacy and won't spam you.
 		</p>
 	{/if}
 
