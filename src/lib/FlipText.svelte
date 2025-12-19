@@ -316,6 +316,7 @@
 		}
 		button.letters:not(:disabled) {
 			cursor: pointer;
+			touch-action: manipulation;
 			&:hover {
 				color: #ffffff;
 				transition: scale 100ms ease;

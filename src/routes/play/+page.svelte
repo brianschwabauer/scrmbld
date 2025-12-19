@@ -662,6 +662,7 @@
 		font-optical-sizing: auto;
 		font-weight: 400;
 		font-style: normal;
+		touch-action: manipulation;
 		@media (min-width: 600px) {
 			font-size: 1.5rem;
 		}
@@ -745,6 +746,7 @@
 			justify-content: center;
 			gap: 0.5rem;
 			font-size: 1.2rem;
+			touch-action: manipulation;
 			@media (min-width: 400px) {
 				font-size: 1.5rem;
 				padding: 0.75rem 1rem;
