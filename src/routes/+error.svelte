@@ -35,7 +35,7 @@
 			margin: 2rem 0 0.5rem;
 		}
 		p {
-			margin: 0 0 2rem;
+			margin: 0 auto 2rem;
 			max-width: 400px;
 			text-align: center;
 			text-wrap: pretty;
