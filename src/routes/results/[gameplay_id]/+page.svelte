@@ -326,7 +326,7 @@
 		}
 		@media (min-width: 768px) {
 			justify-content: center;
-			padding: 0;
+			padding: 1rem 0;
 			:global(.my-time) {
 				font-size: 3.5rem;
 			}
@@ -364,7 +364,7 @@
 		cursor: pointer;
 		font-size: 1.35rem;
 		text-decoration: none;
-		border-radius: 20px;
+		border-radius: 4px;
 		padding: 0.5em 1em;
 		margin: 0 0 0.75rem;
 		font-weight: 500;
@@ -381,6 +381,15 @@
 		max-width: 400px;
 		text-align: center;
 		box-sizing: border-box;
+		transition:
+			transform 0.07s,
+			opacity 0.2s;
+		box-shadow: 0 4px 0 #333333;
+		touch-action: manipulation;
+		&:active {
+			transform: translateY(4px);
+			box-shadow: none;
+		}
 		&:disabled {
 			opacity: 0.65;
 			cursor: not-allowed;
@@ -391,6 +400,7 @@
 		&.primary {
 			background-color: #eeeeee;
 			color: #333333;
+			box-shadow: 0 4px 0 #999999;
 			&:hover {
 				background-color: #ffffff;
 				color: #000000;

@@ -570,7 +570,7 @@
 		background-color: rgba(255, 255, 255, 0.05);
 		color: #dddddd;
 		padding: 0.5rem 1rem;
-		border-radius: 999px;
+		border-radius: 4px;
 		text-decoration: none;
 		font-size: 0.9rem;
 		font-weight: 500;
@@ -649,7 +649,7 @@
 		cursor: pointer;
 		font-size: 1rem;
 		text-decoration: none;
-		border-radius: 999px;
+		border-radius: 4px;
 		padding: 0.5em 1em;
 		margin: 0;
 		font-weight: 500;
@@ -663,6 +663,14 @@
 		font-weight: 400;
 		font-style: normal;
 		touch-action: manipulation;
+		transition:
+			transform 0.07s,
+			opacity 0.2s;
+		box-shadow: 0 4px 0 #333333;
+		&:active {
+			transform: translateY(4px);
+			box-shadow: none;
+		}
 		@media (min-width: 600px) {
 			font-size: 1.5rem;
 		}
@@ -733,7 +741,7 @@
 			background-color: rgba(255, 255, 255, 0.05);
 			color: #dddddd;
 			padding: 0.75rem 0.5rem;
-			border-radius: 20px;
+			border-radius: 4px;
 			text-decoration: none;
 			font-weight: 500;
 			text-align: center;
