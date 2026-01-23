@@ -55,7 +55,12 @@
 
 <div class="container">
 	<header>
-		<h1>Account</h1>
+		<div class="title">
+			<h1>Account</h1>
+			{#if data.user?.email}
+				<p class="email">{data.user.email}</p>
+			{/if}
+		</div>
 		<button
 			type="button"
 			class="sign-out"
@@ -235,6 +240,18 @@
 		display: flex;
 		justify-content: space-between;
 		align-items: center;
+
+		.title {
+			display: flex;
+			flex-direction: column;
+			gap: 0.25rem;
+		}
+
+		.email {
+			font-size: 1.1rem;
+			color: #888888;
+			margin: 0;
+		}
 	}
 
 	h1 {
