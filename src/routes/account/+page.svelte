@@ -449,8 +449,8 @@
 		text-box: trim-both cap alphabetic;
 
 		&.pending {
-			background-color: rgba(255, 193, 7, 0.2);
-			color: #ffc107;
+			background-color: rgba(255, 255, 255, 0.4);
+			color: #222222;
 		}
 	}
 
