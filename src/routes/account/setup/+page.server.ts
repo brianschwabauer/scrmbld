@@ -1,0 +1,77 @@
+import { redirect } from '@sveltejs/kit';
+import { initAuth } from '$lib/server/auth';
+import { createDb } from '$lib/server/db';
+import { user } from '$lib/server/schema';
+import { eq } from 'drizzle-orm';
+
+export const load = async ({ request, platform }) => {
+	if (!platform?.env?.D1) return {};
+
+	const auth = initAuth(platform.env.D1, platform.env);
+	const session = await auth.api.getSession({
+		headers: request.headers,
+	});
+
+	if (!session) {
+		throw redirect(302, '/signin');
+	}
+
+	return {
+		user: session.user,
+	};
+};
+
+export const actions = {
+	save: async ({ request, platform }) => {
+		if (!platform?.env?.D1) return { success: false, error: 'Database unavailable' };
+
+		const auth = initAuth(platform.env.D1, platform.env);
+		const session = await auth.api.getSession({ headers: request.headers });
+		if (!session) return { success: false, error: 'Unauthorized' };
+
+		const formData = await request.formData();
+		const name = (formData.get('name') as string)?.trim() || '';
+		const username = (formData.get('username') as string)?.trim().toLowerCase() || '';
+
+		// Validate username if provided
+		if (username) {
+			if (!/^[a-zA-Z0-9]{6,}$/.test(username)) {
+				return { success: false, error: 'Username must be at least 6 alphanumeric characters' };
+			}
+
+			const db = createDb(platform.env.D1);
+
+			// Check if username is taken
+			const existing = await db.query.user.findFirst({
+				where: eq(user.username, username),
+			});
+
+			if (existing && existing.id !== session.user.id) {
+				return { success: false, error: 'Username is already taken' };
+			}
+
+			await db
+				.update(user)
+				.set({ name, username })
+				.where(eq(user.id, session.user.id));
+		} else {
+			const db = createDb(platform.env.D1);
+			await db
+				.update(user)
+				.set({ name })
+				.where(eq(user.id, session.user.id));
+		}
+
+		throw redirect(302, '/account');
+	},
+
+	skip: async ({ request, platform }) => {
+		if (!platform?.env?.D1) throw redirect(302, '/account');
+
+		const auth = initAuth(platform.env.D1, platform.env);
+		const session = await auth.api.getSession({ headers: request.headers });
+		if (!session) throw redirect(302, '/signin');
+
+		throw redirect(302, '/account');
+	},
+};
