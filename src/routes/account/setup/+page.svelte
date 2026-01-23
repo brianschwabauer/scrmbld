@@ -19,7 +19,7 @@
 			saving = true;
 			return async ({ update }) => {
 				saving = false;
-				await update();
+				await update({ reset: false });
 			};
 		}}
 	>
@@ -49,9 +49,7 @@
 	</form>
 
 	<form method="POST" action="?/skip" use:enhance>
-		<button type="submit" class="skip" disabled={saving}>
-			Skip for now
-		</button>
+		<button type="submit" class="skip" disabled={saving}>Skip for now</button>
 	</form>
 </div>
 
