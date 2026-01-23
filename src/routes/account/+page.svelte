@@ -8,8 +8,46 @@
 	let privacySettings = $derived(
 		data.user?.privacySettings
 			? JSON.parse(data.user.privacySettings)
-			: { profile: 'public', show_name: false },
+			: { profile: 'public' },
 	);
+
+	// Track original values to detect changes
+	let originalUsername = $state(data.user?.username || '');
+	let originalName = $state(data.user?.name || '');
+	let originalProfile = $state(privacySettings.profile);
+
+	// Track form field values
+	let username = $state(data.user?.username || '');
+	let name = $state(data.user?.name || '');
+	let profile = $state(privacySettings.profile);
+
+	// Check if any field has changed from original
+	let hasChanges = $derived(
+		username !== originalUsername ||
+		name !== originalName ||
+		profile !== originalProfile
+	);
+
+	// Sync originals after successful save
+	function syncAfterSave() {
+		originalUsername = username;
+		originalName = name;
+		originalProfile = profile;
+	}
+
+	// Auto-hide success message after 5 seconds
+	let showSuccess = $state(false);
+	let successTimeout: ReturnType<typeof setTimeout> | null = null;
+
+	$effect(() => {
+		if (form?.success && form?.message === 'Profile updated') {
+			showSuccess = true;
+			if (successTimeout) clearTimeout(successTimeout);
+			successTimeout = setTimeout(() => {
+				showSuccess = false;
+			}, 5000);
+		}
+	});
 </script>
 
 <div class="container">
@@ -27,41 +65,42 @@
 
 	<section>
 		<h2>Profile</h2>
-		<form method="POST" action="?/updateProfile" use:enhance>
+		<form method="POST" action="?/updateProfile" use:enhance={() => {
+			return async ({ result, update }) => {
+				await update({ reset: false });
+				if (result.type === 'success') {
+					syncAfterSave();
+				}
+			};
+		}}>
 			<div class="field">
 				<label for="username">Username</label>
 				<input
 					type="text"
 					id="username"
 					name="username"
-					value={data.user.username || ''}
+					bind:value={username}
 					placeholder="Choose a username"
 				/>
 				<small class="hint">Min 6 alphanumeric characters. Used for friend invites.</small>
 			</div>
 			<div class="field">
 				<label for="name">Display Name</label>
-				<input type="text" id="name" name="name" value={data.user.name || ''} />
+				<input type="text" id="name" name="name" bind:value={name} />
 			</div>
 			<div class="field">
 				<label for="profile">Profile Privacy</label>
-				<select id="profile" name="profile" value={privacySettings.profile}>
+				<select id="profile" name="profile" bind:value={profile}>
 					<option value="public">Public</option>
 					<option value="friends">Friends Only</option>
 					<option value="private">Private</option>
 				</select>
 			</div>
-			<div class="field check">
-				<label>
-					<input type="checkbox" name="showName" checked={privacySettings.show_name} />
-					Show Name on Public Profile
-				</label>
-			</div>
-			<button type="submit">Save Changes</button>
+			<button type="submit" disabled={!hasChanges}>Save Changes</button>
 		</form>
-		{#if form?.success && form?.message === 'Profile updated'}
+		{#if showSuccess}
 			<p class="success">Saved!</p>
-		{:else if form?.error && form?.message !== 'Profile updated'}
+		{:else if form?.error}
 			<p class="error">{form.error}</p>
 		{/if}
 	</section>
@@ -243,21 +282,6 @@
 		}
 	}
 
-	.check label {
-		flex-direction: row;
-		align-items: center;
-		gap: 0.5rem;
-		cursor: pointer;
-		color: #cccccc;
-		font-size: 0.95rem;
-	}
-
-	input[type='checkbox'] {
-		width: 1.1rem;
-		height: 1.1rem;
-		cursor: pointer;
-	}
-
 	button {
 		padding: 0.75rem 1rem;
 		font-size: 1rem;
@@ -269,15 +293,25 @@
 		font-weight: bold;
 		transition:
 			transform 0.1s,
-			opacity 0.2s;
+			opacity 0.2s,
+			background-color 0.2s,
+			color 0.2s,
+			box-shadow 0.2s;
 		box-shadow: 0 4px 0 #999999;
 		-webkit-tap-highlight-color: transparent;
 
-		&:hover {
+		&:disabled {
+			background-color: #555555;
+			color: #888888;
+			box-shadow: 0 4px 0 #333333;
+			cursor: not-allowed;
+		}
+
+		&:hover:not(:disabled) {
 			opacity: 0.9;
 		}
 
-		&:active {
+		&:active:not(:disabled) {
 			transform: translateY(4px);
 			box-shadow: none;
 		}
