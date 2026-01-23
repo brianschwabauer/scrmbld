@@ -1,190 +1,133 @@
 <script lang="ts">
-	import { ripple } from '$lib/ripple';
+	import { signUp, signIn } from '$lib/auth-client';
+	import { goto } from '$app/navigation';
 
 	let email = $state('');
+	let password = $state('');
 	let name = $state('');
-	let errorMessage = $state('');
-	let signingUp = $state(false);
-	let signedUp = $state(false);
+	let username = $state('');
+	let loading = $state(false);
+	let error = $state('');
 
-	async function handleSignup() {
-		signingUp = true;
-		errorMessage = '';
-		const response = await fetch('/api/signup', {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json',
-			},
-			body: JSON.stringify({ email, name }),
-		});
-		if (response.ok) {
-			email = '';
-			name = '';
-			signedUp = true;
-		} else {
-			if (response.status === 400) {
-				const data = await response.json<any>();
-				errorMessage = data?.message || 'Invalid signup data.';
-			} else if (response.status === 409) {
-				errorMessage = 'This email is already signed up.';
-			} else {
-				errorMessage = 'There was an error signing up. Please try again later.';
-			}
+	async function handleSignUp() {
+		if (!email || !password) {
+			error = 'Email and password are required';
+			return;
 		}
-		signingUp = false;
+		if (username && !/^[a-zA-Z0-9]{6,}$/.test(username)) {
+			error = 'Username must be at least 6 alphanumeric characters';
+			return;
+		}
+
+		loading = true;
+		error = '';
+
+		try {
+			const { data, error: err } = await signUp.email({
+				email,
+				password,
+				name,
+				username: username || undefined,
+			});
+
+			if (err) {
+				error = err.message || 'Signup failed';
+			} else {
+				goto('/account');
+			}
+		} catch (e) {
+			error = 'An unexpected error occurred';
+		} finally {
+			loading = false;
+		}
+	}
+
+	async function handleGoogle() {
+		await signIn.social({ provider: 'google', callbackURL: '/account' });
 	}
 </script>
 
-<div class="container">
-	<h1>Sign Up<br /><small>to Receive Updates</small></h1>
+<div class="auth-container">
+	<h1>Create Account</h1>
 
-	{#if signedUp}
-		<p class="success">Thank you for signing up! We'll keep you updated with the latest news.</p>
-	{:else if errorMessage}
-		<p class="error">{errorMessage}</p>
-	{:else}
-		<p>
-			Stay informed about our upcoming card game launch on Kickstarter, new features, and special
-			events. We respect your privacy and won't spam you.
-		</p>
-	{/if}
-
-	<form onsubmit={handleSignup} style:pointer-events={signingUp || signedUp ? 'none' : 'auto'}>
-		<input type="email" placeholder="Email" bind:value={email} required disabled={signingUp} />
-		<input type="text" placeholder="Name" bind:value={name} disabled={signingUp} />
-		<button type="submit" disabled={!email || signingUp || signedUp}>Sign Up</button>
-	</form>
-	<div class="actions">
-		<a href="/" class="button" use:ripple>Back to Game</a>
+	<div class="social-auth">
+		<button onclick={handleGoogle}>Sign up with Google</button>
 	</div>
+
+	<div class="divider">OR</div>
+
+	<form
+		onsubmit={(e) => {
+			e.preventDefault();
+			handleSignUp();
+		}}
+	>
+		<div class="field">
+			<label for="email">Email</label>
+			<input type="email" id="email" bind:value={email} required />
+		</div>
+
+		<div class="field">
+			<label for="password">Password</label>
+			<input type="password" id="password" bind:value={password} required />
+		</div>
+
+		<div class="field">
+			<label for="name">Display Name (Optional)</label>
+			<input type="text" id="name" bind:value={name} placeholder="e.g. John Doe" />
+		</div>
+
+		<div class="field">
+			<label for="username">Username (Optional)</label>
+			<input
+				type="text"
+				id="username"
+				bind:value={username}
+				placeholder="Unique username (min 6 chars)"
+			/>
+			<small>Used for friend invites. Must be alphanumeric.</small>
+		</div>
+
+		{#if error}
+			<p class="error">{error}</p>
+		{/if}
+
+		<button type="submit" disabled={loading}>
+			{loading ? 'Creating Account...' : 'Sign Up'}
+		</button>
+	</form>
+
+	<p>Already have an account? <a href="/signin">Sign In</a></p>
 </div>
 
-<style lang="scss">
-	.container {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		justify-content: center;
-		padding: 2rem 1rem 8rem;
-		max-width: 500px;
-		margin: 0 auto;
-		text-align: center;
-		gap: 1rem;
-		min-height: calc(100svh - 10rem);
+<style>
+	.auth-container {
+		max-width: 400px;
+		margin: 2rem auto;
+		padding: 1rem;
 	}
-
-	h1 {
-		font-size: 2.5rem;
-		margin: 0;
-		line-height: 0.9;
-		small {
-			font-size: 0.8em;
-		}
+	.field {
+		margin-bottom: 1rem;
 	}
-
-	p {
-		font-size: 1.15rem;
-		text-wrap: pretty;
-		line-height: 1.4;
-		margin: 0;
-		@media (min-width: 600px) {
-			font-size: 1.25rem;
-		}
-		&.error {
-			color: #ff6f6f;
-		}
-		&.success {
-			color: #02cfb7;
-		}
+	label {
+		display: block;
+		margin-bottom: 0.5rem;
 	}
-
-	.actions {
-		position: fixed;
-		bottom: 1.5rem;
-		z-index: 10;
-	}
-
-	form {
-		display: flex;
-		flex-direction: column;
-		margin: 1.5rem 0 4rem;
-		gap: 1.25rem;
+	input {
 		width: 100%;
-		max-width: 350px;
-
-		input {
-			padding: 0.75rem 1rem;
-			font-size: 1.2rem;
-			border: 1px solid #cccccc;
-			border-radius: 4px;
-			width: 100%;
-			box-sizing: border-box;
-			background-color: transparent;
-			color: #eeeeee;
-			outline: none;
-			&::placeholder {
-				color: #bbbbbb;
-				opacity: 1;
-			}
-			&:focus {
-				border-color: #aaaaaa;
-				color: #ffffff;
-				box-shadow: none;
-			}
-		}
-
-		button {
-			padding: 0.75rem 1rem;
-			font-size: 1.2rem;
-			background-color: #eeeeee;
-			color: #333333;
-			border: none;
-			border-radius: 4px;
-			cursor: pointer;
-			font-weight: bold;
-			transition:
-				transform 0.1s,
-				opacity 0.2s;
-			box-shadow: 0 4px 0 #999999;
-			-webkit-tap-highlight-color: transparent;
-
-			&:disabled {
-				opacity: 0.65;
-				cursor: not-allowed;
-			}
-			&:active:not(:disabled) {
-				transform: translateY(4px);
-				box-shadow: none;
-			}
-
-			&:hover:not(:disabled) {
-				opacity: 0.9;
-			}
-		}
+		padding: 0.5rem;
 	}
-
-	.button {
-		display: inline-block;
-		padding: 1rem 2rem;
-		background-color: #eeeeee;
-		color: #444444;
-		text-decoration: none;
-		font-weight: bold;
-		border-radius: 4px;
-		font-size: 1.5rem;
-		transition:
-			transform 0.1s,
-			opacity 0.2s;
-		box-shadow: 0 4px 0 #999999;
-		-webkit-tap-highlight-color: transparent;
-
-		&:active {
-			transform: translateY(4px);
-			box-shadow: none;
-		}
-
-		&:hover {
-			opacity: 0.9;
-		}
+	.error {
+		color: red;
+	}
+	.divider {
+		text-align: center;
+		margin: 1rem 0;
+	}
+	.social-auth button {
+		width: 100%;
+		padding: 0.5rem;
+		background: #eee;
+		border: 1px solid #ccc;
 	}
 </style>
