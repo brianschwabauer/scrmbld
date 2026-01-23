@@ -33,10 +33,11 @@
 				<input
 					type="text"
 					id="username"
+					name="username"
 					value={data.user.username || ''}
-					disabled
-					title="Username cannot be changed"
+					placeholder="Choose a username"
 				/>
+				<small class="hint">Min 6 alphanumeric characters. Used for friend invites.</small>
 			</div>
 			<div class="field">
 				<label for="name">Display Name</label>
@@ -60,6 +61,8 @@
 		</form>
 		{#if form?.success && form?.message === 'Profile updated'}
 			<p class="success">Saved!</p>
+		{:else if form?.error && form?.message !== 'Profile updated'}
+			<p class="error">{form.error}</p>
 		{/if}
 	</section>
 
@@ -191,18 +194,23 @@
 		display: flex;
 		flex-direction: column;
 		gap: 0.4rem;
+
+		.hint {
+			color: #888888;
+			font-size: 0.8rem;
+		}
 	}
 
 	label {
 		font-size: 0.9rem;
-		color: #999999;
+		color: #bbbbbb;
 	}
 
 	input[type='text'],
 	select {
 		padding: 0.75rem 1rem;
 		font-size: 1rem;
-		border: 1px solid #555555;
+		border: 1px solid #888888;
 		border-radius: 4px;
 		width: 100%;
 		box-sizing: border-box;
@@ -211,12 +219,12 @@
 		outline: none;
 
 		&::placeholder {
-			color: #777777;
+			color: #999999;
 			opacity: 1;
 		}
 
 		&:focus {
-			border-color: #888888;
+			border-color: #aaaaaa;
 			color: #ffffff;
 		}
 
