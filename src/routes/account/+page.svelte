@@ -35,19 +35,25 @@
 		originalProfile = profile;
 	}
 
-	// Auto-hide success message after 5 seconds
-	let showSuccess = $state(false);
-	let successTimeout: ReturnType<typeof setTimeout> | null = null;
+	// Track which section had the last action for showing feedback
+	let lastAction = $state<'profile' | 'history' | 'friends' | null>(null);
 
-	$effect(() => {
-		if (form?.success && form?.message === 'Profile updated') {
-			showSuccess = true;
-			if (successTimeout) clearTimeout(successTimeout);
-			successTimeout = setTimeout(() => {
-				showSuccess = false;
-			}, 5000);
-		}
-	});
+	// Auto-hide success messages after 5 seconds
+	let showProfileSuccess = $state(false);
+	let showFriendsSuccess = $state(false);
+	let showHistorySuccess = $state(false);
+
+	function showSuccessFor(section: 'profile' | 'history' | 'friends') {
+		if (section === 'profile') showProfileSuccess = true;
+		else if (section === 'history') showHistorySuccess = true;
+		else if (section === 'friends') showFriendsSuccess = true;
+
+		setTimeout(() => {
+			if (section === 'profile') showProfileSuccess = false;
+			else if (section === 'history') showHistorySuccess = false;
+			else if (section === 'friends') showFriendsSuccess = false;
+		}, 5000);
+	}
 </script>
 
 <div class="container">
@@ -66,10 +72,12 @@
 	<section>
 		<h2>Profile</h2>
 		<form method="POST" action="?/updateProfile" use:enhance={() => {
+			lastAction = 'profile';
 			return async ({ result, update }) => {
 				await update({ reset: false });
-				if (result.type === 'success') {
+				if (result.type === 'success' && result.data?.success) {
 					syncAfterSave();
+					showSuccessFor('profile');
 				}
 			};
 		}}>
@@ -98,9 +106,9 @@
 			</div>
 			<button type="submit" disabled={!hasChanges}>Save Changes</button>
 		</form>
-		{#if showSuccess}
+		{#if showProfileSuccess}
 			<p class="success">Saved!</p>
-		{:else if form?.error}
+		{:else if form?.error && lastAction === 'profile'}
 			<p class="error">{form.error}</p>
 		{/if}
 	</section>
@@ -108,11 +116,21 @@
 	<section>
 		<h2>Game History</h2>
 		<p>If you have played anonymously on this device, you can import your history.</p>
-		<form method="POST" action="?/claimHistory" use:enhance>
+		<form method="POST" action="?/claimHistory" use:enhance={() => {
+			lastAction = 'history';
+			return async ({ result, update }) => {
+				await update({ reset: false });
+				if (result.type === 'success' && result.data?.success) {
+					showSuccessFor('history');
+				}
+			};
+		}}>
 			<button type="submit" class="secondary">Import History from this Device</button>
 		</form>
-		{#if form?.message && form?.count !== undefined}
+		{#if showHistorySuccess && form?.message}
 			<p class="success">{form.message}</p>
+		{:else if form?.error && lastAction === 'history'}
+			<p class="error">{form.error}</p>
 		{/if}
 	</section>
 
@@ -147,11 +165,21 @@
 		</div>
 
 		<h3>Add Friend</h3>
-		<form method="POST" action="?/sendFriendRequest" use:enhance class="add-friend">
+		<form method="POST" action="?/sendFriendRequest" use:enhance={() => {
+			lastAction = 'friends';
+			return async ({ result, update }) => {
+				await update({ reset: false });
+				if (result.type === 'success' && result.data?.success) {
+					showSuccessFor('friends');
+				}
+			};
+		}} class="add-friend">
 			<input type="text" name="username" placeholder="Username" required />
 			<button type="submit">Send Invite</button>
 		</form>
-		{#if form?.error}
+		{#if showFriendsSuccess}
+			<p class="success">Friend request sent!</p>
+		{:else if form?.error && lastAction === 'friends'}
 			<p class="error">{form.error}</p>
 		{/if}
 	</section>
