@@ -171,7 +171,6 @@ export const actions = {
 
 		const formData = await request.formData();
 		const profile = formData.get('profile') as string;
-		const showName = formData.get('showName') === 'on';
 		const name = (formData.get('name') as string)?.trim() || '';
 		const newUsername = (formData.get('username') as string)?.trim().toLowerCase() || '';
 
@@ -198,7 +197,7 @@ export const actions = {
 			.set({
 				name,
 				username: newUsername || null,
-				privacySettings: JSON.stringify({ profile, show_name: showName }),
+				privacySettings: JSON.stringify({ profile }),
 			})
 			.where(eq(user.id, session.user.id));
 
