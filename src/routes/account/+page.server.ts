@@ -1,8 +1,8 @@
 import { redirect } from '@sveltejs/kit';
 import { initAuth } from '$lib/server/auth';
 import { createDb } from '$lib/server/db';
-import { friendship, gameplay, user } from '$lib/server/schema';
-import { eq, or, and, isNull } from 'drizzle-orm';
+import { account, friendship, gameplay, user } from '$lib/server/schema';
+import { eq, or, and, isNull, count } from 'drizzle-orm';
 
 export const load = async ({ request, cookies, platform }) => {
 	if (!platform?.env?.D1) return {};
@@ -20,6 +20,15 @@ export const load = async ({ request, cookies, platform }) => {
 
 	// Check if user has anonymous game history to import
 	const anonUuid = cookies.get('scrmbld_user_uuid');
+
+	// Fetch linked accounts (sign-in methods)
+	const linkedAccounts = await db
+		.select({
+			id: account.id,
+			providerId: account.providerId,
+		})
+		.from(account)
+		.where(eq(account.userId, session.user.id));
 
 	// Fetch friends
 	const friends = await db
@@ -45,6 +54,7 @@ export const load = async ({ request, cookies, platform }) => {
 		user: session.user,
 		friends,
 		hasAnonHistory: !!anonUuid,
+		linkedAccounts,
 	};
 };
 
@@ -211,5 +221,139 @@ export const actions = {
 			.where(eq(user.id, session.user.id));
 
 		return { success: true, message: 'Profile updated' };
+	},
+
+	unlinkAccount: async ({ request, platform }) => {
+		if (!platform?.env?.D1) return { success: false };
+		const auth = initAuth(platform.env.D1, platform.env);
+		const session = await auth.api.getSession({ headers: request.headers });
+		if (!session) return { success: false, error: 'Unauthorized' };
+
+		const formData = await request.formData();
+		const providerId = formData.get('providerId') as string;
+
+		const db = createDb(platform.env.D1);
+
+		// Count how many accounts the user has linked
+		const accountCount = await db
+			.select({ count: count() })
+			.from(account)
+			.where(eq(account.userId, session.user.id));
+
+		if (accountCount[0].count <= 1) {
+			return { success: false, error: 'Cannot remove your only sign-in method' };
+		}
+
+		// Delete the account link
+		await db
+			.delete(account)
+			.where(and(eq(account.userId, session.user.id), eq(account.providerId, providerId)));
+
+		return { success: true };
+	},
+
+	changePassword: async ({ request, platform }) => {
+		if (!platform?.env?.D1) return { success: false };
+		const auth = initAuth(platform.env.D1, platform.env);
+		const session = await auth.api.getSession({ headers: request.headers });
+		if (!session) return { success: false, error: 'Unauthorized' };
+
+		const formData = await request.formData();
+		const currentPassword = formData.get('currentPassword') as string;
+		const newPassword = formData.get('newPassword') as string;
+		const confirmPassword = formData.get('confirmPassword') as string;
+
+		if (!currentPassword || !newPassword) {
+			return { success: false, error: 'All fields are required' };
+		}
+
+		if (newPassword.length < 8) {
+			return { success: false, error: 'Password must be at least 8 characters' };
+		}
+
+		if (newPassword !== confirmPassword) {
+			return { success: false, error: 'Passwords do not match' };
+		}
+
+		try {
+			await auth.api.changePassword({
+				body: {
+					currentPassword,
+					newPassword,
+				},
+				headers: request.headers,
+			});
+			return { success: true };
+		} catch (e: any) {
+			return { success: false, error: e?.message || 'Failed to change password' };
+		}
+	},
+
+	changeEmail: async ({ request, platform }) => {
+		if (!platform?.env?.D1) return { success: false };
+		const auth = initAuth(platform.env.D1, platform.env);
+		const session = await auth.api.getSession({ headers: request.headers });
+		if (!session) return { success: false, error: 'Unauthorized' };
+
+		const formData = await request.formData();
+		const newEmail = formData.get('newEmail') as string;
+
+		if (!newEmail) {
+			return { success: false, error: 'New email is required' };
+		}
+
+		const db = createDb(platform.env.D1);
+
+		// Check if email is already taken
+		const existingUser = await db.query.user.findFirst({
+			where: eq(user.email, newEmail.toLowerCase()),
+		});
+
+		if (existingUser && existingUser.id !== session.user.id) {
+			return { success: false, error: 'Email is already in use' };
+		}
+
+		try {
+			await auth.api.changeEmail({
+				body: { newEmail },
+				headers: request.headers,
+			});
+			return { success: true, message: 'Verification email sent to new address' };
+		} catch (e: any) {
+			return { success: false, error: e?.message || 'Failed to change email' };
+		}
+	},
+
+	setPassword: async ({ request, platform }) => {
+		if (!platform?.env?.D1) return { success: false };
+		const auth = initAuth(platform.env.D1, platform.env);
+		const session = await auth.api.getSession({ headers: request.headers });
+		if (!session) return { success: false, error: 'Unauthorized' };
+
+		const formData = await request.formData();
+		const newPassword = formData.get('newPassword') as string;
+		const confirmPassword = formData.get('confirmPassword') as string;
+
+		if (!newPassword) {
+			return { success: false, error: 'Password is required' };
+		}
+
+		if (newPassword.length < 8) {
+			return { success: false, error: 'Password must be at least 8 characters' };
+		}
+
+		if (newPassword !== confirmPassword) {
+			return { success: false, error: 'Passwords do not match' };
+		}
+
+		try {
+			await auth.api.setPassword({
+				body: { newPassword },
+				headers: request.headers,
+			});
+			return { success: true };
+		} catch (e: any) {
+			return { success: false, error: e?.message || 'Failed to set password' };
+		}
 	},
 };

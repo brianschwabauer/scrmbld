@@ -1,9 +1,38 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	import { signOut } from '$lib/auth-client';
+	import { signIn, signOut } from '$lib/auth-client';
 	import { goto } from '$app/navigation';
 
 	let { data, form } = $props();
+
+	// Derived account info
+	let hasGoogle = $derived(data.linkedAccounts?.some((a: { providerId: string }) => a.providerId === 'google'));
+	let hasPassword = $derived(data.linkedAccounts?.some((a: { providerId: string }) => a.providerId === 'credential'));
+	let canRemoveMethod = $derived((data.linkedAccounts?.length ?? 0) > 1);
+
+	// Security section state
+	let showChangePassword = $state(false);
+	let showSetPassword = $state(false);
+	let showChangeEmail = $state(false);
+	let currentPassword = $state('');
+	let newPassword = $state('');
+	let confirmPassword = $state('');
+	let newEmail = $state('');
+	let securityLoading = $state(false);
+	let securityError = $state('');
+	let securitySuccess = $state('');
+
+	function clearSecurityForms() {
+		currentPassword = '';
+		newPassword = '';
+		confirmPassword = '';
+		newEmail = '';
+		securityError = '';
+	}
+
+	async function linkGoogle() {
+		await signIn.social({ provider: 'google', callbackURL: '/account' });
+	}
 
 	let privacySettings = $derived(
 		data.user?.privacySettings ? JSON.parse(data.user.privacySettings) : { profile: 'public' },
@@ -32,7 +61,7 @@
 	}
 
 	// Track which section had the last action for showing feedback
-	let lastAction = $state<'profile' | 'history' | 'friends' | null>(null);
+	let lastAction = $state<'profile' | 'history' | 'friends' | 'security' | null>(null);
 
 	// Auto-hide success messages after 5 seconds
 	let showProfileSuccess = $state(false);
@@ -117,6 +146,254 @@
 		{#if showProfileSuccess}
 			<p class="success">Saved!</p>
 		{:else if form?.error && lastAction === 'profile'}
+			<p class="error">{form.error}</p>
+		{/if}
+	</section>
+
+	<section>
+		<h2>Security</h2>
+
+		<div class="security-subsection">
+			<h3>Sign-in Methods</h3>
+			<div class="signin-methods">
+				<div class="method">
+					<div class="method-info">
+						<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+							<rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
+						</svg>
+						<span>Email & Password</span>
+					</div>
+					{#if hasPassword}
+						<div class="method-status">
+							<span class="badge connected">Connected</span>
+							{#if canRemoveMethod}
+								<form method="POST" action="?/unlinkAccount" use:enhance={() => {
+									lastAction = 'security';
+									return async ({ result, update }) => {
+										await update({ reset: false });
+									};
+								}}>
+									<input type="hidden" name="providerId" value="credential" />
+									<button type="submit" class="icon-btn danger" title="Remove sign-in method">
+										<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+											<path d="M18 6 6 18"/><path d="m6 6 12 12"/>
+										</svg>
+									</button>
+								</form>
+							{/if}
+						</div>
+					{:else}
+						<button type="button" class="small" onclick={() => { showSetPassword = true; clearSecurityForms(); }}>
+							Add Password
+						</button>
+					{/if}
+				</div>
+
+				<div class="method">
+					<div class="method-info">
+						<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24">
+							<path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+							<path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+							<path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+							<path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+						</svg>
+						<span>Google</span>
+					</div>
+					{#if hasGoogle}
+						<div class="method-status">
+							<span class="badge connected">Connected</span>
+							{#if canRemoveMethod}
+								<form method="POST" action="?/unlinkAccount" use:enhance={() => {
+									lastAction = 'security';
+									return async ({ result, update }) => {
+										await update({ reset: false });
+									};
+								}}>
+									<input type="hidden" name="providerId" value="google" />
+									<button type="submit" class="icon-btn danger" title="Remove sign-in method">
+										<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+											<path d="M18 6 6 18"/><path d="m6 6 12 12"/>
+										</svg>
+									</button>
+								</form>
+							{/if}
+						</div>
+					{:else}
+						<button type="button" class="small" onclick={linkGoogle}>
+							Connect
+						</button>
+					{/if}
+				</div>
+			</div>
+		</div>
+
+		{#if hasPassword}
+			<div class="security-subsection">
+				<h3>Password</h3>
+				{#if showChangePassword}
+					<form
+						method="POST"
+						action="?/changePassword"
+						use:enhance={() => {
+							securityLoading = true;
+							securityError = '';
+							lastAction = 'security';
+							return async ({ result, update }) => {
+								securityLoading = false;
+								if (result.type === 'success' && result.data?.success) {
+									securitySuccess = 'Password changed successfully';
+									showChangePassword = false;
+									clearSecurityForms();
+									setTimeout(() => securitySuccess = '', 5000);
+								}
+								await update({ reset: false });
+							};
+						}}
+					>
+						<input
+							type="password"
+							name="currentPassword"
+							placeholder="Current password"
+							bind:value={currentPassword}
+							required
+							disabled={securityLoading}
+						/>
+						<input
+							type="password"
+							name="newPassword"
+							placeholder="New password"
+							bind:value={newPassword}
+							required
+							minlength="8"
+							disabled={securityLoading}
+						/>
+						<input
+							type="password"
+							name="confirmPassword"
+							placeholder="Confirm new password"
+							bind:value={confirmPassword}
+							required
+							minlength="8"
+							disabled={securityLoading}
+						/>
+						<div class="form-actions">
+							<button type="submit" disabled={securityLoading || !currentPassword || newPassword.length < 8 || newPassword !== confirmPassword}>
+								{securityLoading ? 'Saving...' : 'Change Password'}
+							</button>
+							<button type="button" class="secondary" onclick={() => { showChangePassword = false; clearSecurityForms(); }}>
+								Cancel
+							</button>
+						</div>
+					</form>
+				{:else}
+					<button type="button" class="secondary" onclick={() => { showChangePassword = true; clearSecurityForms(); }}>
+						Change Password
+					</button>
+				{/if}
+			</div>
+		{:else if showSetPassword}
+			<div class="security-subsection">
+				<h3>Set Password</h3>
+				<p class="hint">Add a password to sign in with email and password.</p>
+				<form
+					method="POST"
+					action="?/setPassword"
+					use:enhance={() => {
+						securityLoading = true;
+						securityError = '';
+						lastAction = 'security';
+						return async ({ result, update }) => {
+							securityLoading = false;
+							if (result.type === 'success' && result.data?.success) {
+								securitySuccess = 'Password set successfully';
+								showSetPassword = false;
+								clearSecurityForms();
+								setTimeout(() => securitySuccess = '', 5000);
+							}
+							await update({ reset: false });
+						};
+					}}
+				>
+					<input
+						type="password"
+						name="newPassword"
+						placeholder="New password"
+						bind:value={newPassword}
+						required
+						minlength="8"
+						disabled={securityLoading}
+					/>
+					<input
+						type="password"
+						name="confirmPassword"
+						placeholder="Confirm password"
+						bind:value={confirmPassword}
+						required
+						minlength="8"
+						disabled={securityLoading}
+					/>
+					<div class="form-actions">
+						<button type="submit" disabled={securityLoading || newPassword.length < 8 || newPassword !== confirmPassword}>
+							{securityLoading ? 'Saving...' : 'Set Password'}
+						</button>
+						<button type="button" class="secondary" onclick={() => { showSetPassword = false; clearSecurityForms(); }}>
+							Cancel
+						</button>
+					</div>
+				</form>
+			</div>
+		{/if}
+
+		<div class="security-subsection">
+			<h3>Email</h3>
+			<p class="current-value">{data.user?.email}</p>
+			{#if showChangeEmail}
+				<form
+					method="POST"
+					action="?/changeEmail"
+					use:enhance={() => {
+						securityLoading = true;
+						securityError = '';
+						lastAction = 'security';
+						return async ({ result, update }) => {
+							securityLoading = false;
+							if (result.type === 'success' && result.data?.success) {
+								securitySuccess = result.data.message || 'Verification email sent';
+								showChangeEmail = false;
+								clearSecurityForms();
+								setTimeout(() => securitySuccess = '', 5000);
+							}
+							await update({ reset: false });
+						};
+					}}
+				>
+					<input
+						type="email"
+						name="newEmail"
+						placeholder="New email address"
+						bind:value={newEmail}
+						required
+						disabled={securityLoading}
+					/>
+					<div class="form-actions">
+						<button type="submit" disabled={securityLoading || !newEmail}>
+							{securityLoading ? 'Sending...' : 'Send Verification'}
+						</button>
+						<button type="button" class="secondary" onclick={() => { showChangeEmail = false; clearSecurityForms(); }}>
+							Cancel
+						</button>
+					</div>
+				</form>
+			{:else}
+				<button type="button" class="secondary" onclick={() => { showChangeEmail = true; clearSecurityForms(); }}>
+					Change Email
+				</button>
+			{/if}
+		</div>
+
+		{#if securitySuccess}
+			<p class="success">{securitySuccess}</p>
+		{:else if form?.error && lastAction === 'security'}
 			<p class="error">{form.error}</p>
 		{/if}
 	</section>
@@ -328,6 +605,8 @@
 	}
 
 	input[type='text'],
+	input[type='password'],
+	input[type='email'],
 	select {
 		padding: 0.75rem 1rem;
 		font-size: 1rem;
@@ -504,6 +783,101 @@
 		&.pending {
 			background-color: rgba(255, 255, 255, 0.4);
 			color: #222222;
+		}
+
+		&.connected {
+			background-color: rgba(2, 207, 183, 0.2);
+			color: #02cfb7;
+		}
+	}
+
+	.security-subsection {
+		margin-bottom: 1.25rem;
+		padding-bottom: 1.25rem;
+		border-bottom: 1px solid #444444;
+
+		&:last-child {
+			margin-bottom: 0;
+			padding-bottom: 0;
+			border-bottom: none;
+		}
+
+		h3 {
+			margin: 0 0 0.75rem;
+		}
+
+		p.hint {
+			color: #888888;
+			font-size: 0.85rem;
+			margin: 0 0 0.75rem;
+		}
+	}
+
+	.signin-methods {
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+	}
+
+	.method {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		padding: 0.75rem;
+		background-color: rgba(255, 255, 255, 0.03);
+		border-radius: 6px;
+		border: 1px solid #555555;
+	}
+
+	.method-info {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		color: #dddddd;
+
+		svg {
+			flex-shrink: 0;
+		}
+	}
+
+	.method-status {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+
+		form {
+			flex-direction: row;
+		}
+	}
+
+	.form-actions {
+		display: flex;
+		gap: 0.75rem;
+
+		button {
+			flex: 1;
+		}
+	}
+
+	.current-value {
+		color: #999999;
+		font-size: 0.9rem;
+		margin: 0 0 0.75rem;
+	}
+
+	button.secondary {
+		background-color: transparent;
+		color: #dddddd;
+		border: 1px solid #666666;
+		box-shadow: none;
+
+		&:hover:not(:disabled) {
+			background-color: rgba(255, 255, 255, 0.05);
+			border-color: #888888;
+		}
+
+		&:active:not(:disabled) {
+			transform: translateY(2px);
 		}
 	}
 
