@@ -6,9 +6,7 @@
 	let { data, form } = $props();
 
 	let privacySettings = $derived(
-		data.user?.privacySettings
-			? JSON.parse(data.user.privacySettings)
-			: { profile: 'public' },
+		data.user?.privacySettings ? JSON.parse(data.user.privacySettings) : { profile: 'public' },
 	);
 
 	// Track original values to detect changes
@@ -23,9 +21,7 @@
 
 	// Check if any field has changed from original
 	let hasChanges = $derived(
-		username !== originalUsername ||
-		name !== originalName ||
-		profile !== originalProfile
+		username !== originalUsername || name !== originalName || profile !== originalProfile,
 	);
 
 	// Sync originals after successful save
@@ -71,16 +67,20 @@
 
 	<section>
 		<h2>Profile</h2>
-		<form method="POST" action="?/updateProfile" use:enhance={() => {
-			lastAction = 'profile';
-			return async ({ result, update }) => {
-				await update({ reset: false });
-				if (result.type === 'success' && result.data?.success) {
-					syncAfterSave();
-					showSuccessFor('profile');
-				}
-			};
-		}}>
+		<form
+			method="POST"
+			action="?/updateProfile"
+			use:enhance={() => {
+				lastAction = 'profile';
+				return async ({ result, update }) => {
+					await update({ reset: false });
+					if (result.type === 'success' && result.data?.success) {
+						syncAfterSave();
+						showSuccessFor('profile');
+					}
+				};
+			}}
+		>
 			<div class="field">
 				<label for="username">Username</label>
 				<input
@@ -113,26 +113,32 @@
 		{/if}
 	</section>
 
-	<section>
-		<h2>Game History</h2>
-		<p>If you have played anonymously on this device, you can import your history.</p>
-		<form method="POST" action="?/claimHistory" use:enhance={() => {
-			lastAction = 'history';
-			return async ({ result, update }) => {
-				await update({ reset: false });
-				if (result.type === 'success' && result.data?.success) {
-					showSuccessFor('history');
-				}
-			};
-		}}>
-			<button type="submit" class="secondary">Import History from this Device</button>
-		</form>
-		{#if showHistorySuccess && form?.message}
-			<p class="success">{form.message}</p>
-		{:else if form?.error && lastAction === 'history'}
-			<p class="error">{form.error}</p>
-		{/if}
-	</section>
+	{#if data.hasAnonHistory}
+		<section>
+			<h2>Game History</h2>
+			<p>You have game history on this device that isn't linked to your account yet.</p>
+			<form
+				method="POST"
+				action="?/claimHistory"
+				use:enhance={() => {
+					lastAction = 'history';
+					return async ({ result, update }) => {
+						await update({ reset: false });
+						if (result.type === 'success' && result.data?.success) {
+							showSuccessFor('history');
+						}
+					};
+				}}
+			>
+				<button type="submit" class="secondary">Link History to My Account</button>
+			</form>
+			{#if showHistorySuccess && form?.message}
+				<p class="success">{form.message}</p>
+			{:else if form?.error && lastAction === 'history'}
+				<p class="error">{form.error}</p>
+			{/if}
+		</section>
+	{/if}
 
 	<section>
 		<h2>Friends</h2>
@@ -147,7 +153,7 @@
 					</div>
 
 					<div class="actions">
-						{#if friend.status === 'pending' && friend.initiatorId !== data.user.id}
+						{#if friend.status === 'pending' && friend.initiatorId !== data.user?.id}
 							<form method="POST" action="?/acceptFriend" use:enhance>
 								<input type="hidden" name="friendshipId" value={friend.friendshipId} />
 								<button type="submit" class="small">Accept</button>
@@ -165,15 +171,20 @@
 		</div>
 
 		<h3>Add Friend</h3>
-		<form method="POST" action="?/sendFriendRequest" use:enhance={() => {
-			lastAction = 'friends';
-			return async ({ result, update }) => {
-				await update({ reset: false });
-				if (result.type === 'success' && result.data?.success) {
-					showSuccessFor('friends');
-				}
-			};
-		}} class="add-friend">
+		<form
+			method="POST"
+			action="?/sendFriendRequest"
+			use:enhance={() => {
+				lastAction = 'friends';
+				return async ({ result, update }) => {
+					await update({ reset: false });
+					if (result.type === 'success' && result.data?.success) {
+						showSuccessFor('friends');
+					}
+				};
+			}}
+			class="add-friend"
+		>
 			<input type="text" name="username" placeholder="Username" required />
 			<button type="submit">Send Invite</button>
 		</form>

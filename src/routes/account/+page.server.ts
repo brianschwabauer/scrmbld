@@ -4,7 +4,7 @@ import { createDb } from '$lib/server/db';
 import { friendship, gameplay, user } from '$lib/server/schema';
 import { eq, or, and, isNull } from 'drizzle-orm';
 
-export const load = async ({ request, platform }) => {
+export const load = async ({ request, cookies, platform }) => {
 	if (!platform?.env?.D1) return {};
 
 	const auth = initAuth(platform.env.D1, platform.env);
@@ -17,6 +17,9 @@ export const load = async ({ request, platform }) => {
 	}
 
 	const db = createDb(platform.env.D1);
+
+	// Check if user has anonymous game history to import
+	const anonUuid = cookies.get('scrmbld_user_uuid');
 
 	// Fetch friends
 	const friends = await db
@@ -41,6 +44,7 @@ export const load = async ({ request, platform }) => {
 	return {
 		user: session.user,
 		friends,
+		hasAnonHistory: !!anonUuid,
 	};
 };
 
@@ -69,7 +73,9 @@ export const actions = {
 		return {
 			success: true,
 			count: result.length,
-			message: `Successfully imported ${result.length} games.`,
+			message: result.length
+				? `Successfully imported ${result.length} games.`
+				: 'No games to import. You may have already claimed your history.',
 		};
 	},
 
