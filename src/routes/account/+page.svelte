@@ -164,7 +164,30 @@
 							{/if}
 							<form method="POST" action="?/removeFriend" use:enhance>
 								<input type="hidden" name="friendshipId" value={friend.friendshipId} />
-								<button type="submit" class="small danger">Remove</button>
+								<button
+									type="submit"
+									class="icon-btn danger"
+									aria-label={friend.status === 'pending'
+										? 'Remove friend invite'
+										: 'Remove friend'}
+									title={friend.status === 'pending' ? 'Remove friend invite' : 'Remove friend'}
+								>
+									<svg
+										xmlns="http://www.w3.org/2000/svg"
+										width="22"
+										height="22"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="2"
+										stroke-linecap="round"
+										stroke-linejoin="round"
+									>
+										<path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" /><path
+											d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"
+										/>
+									</svg>
+								</button>
 							</form>
 						</div>
 					</div>
@@ -400,6 +423,33 @@
 
 			&:active {
 				transform: translateY(2px);
+			}
+		}
+
+		&.icon-btn {
+			padding: 0.4rem;
+			background-color: transparent;
+			border: none;
+			box-shadow: none;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			border-radius: 4px;
+
+			&:hover {
+				background-color: rgba(255, 255, 255, 0.1);
+			}
+
+			&:active {
+				transform: translateY(1px);
+			}
+
+			&.danger {
+				color: #ff6f6f;
+
+				&:hover {
+					background-color: rgba(255, 111, 111, 0.15);
+				}
 			}
 		}
 	}
