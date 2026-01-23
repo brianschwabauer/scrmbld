@@ -47,11 +47,11 @@
 	}
 </script>
 
-<div class="auth-container">
+<div class="container">
 	<h1>Create Account</h1>
 
 	<div class="social-auth">
-		<button onclick={handleGoogle}>Sign up with Google</button>
+		<button type="button" onclick={handleGoogle}>Sign up with Google</button>
 	</div>
 
 	<div class="divider">OR</div>
@@ -62,31 +62,27 @@
 			handleSignUp();
 		}}
 	>
-		<div class="field">
-			<label for="email">Email</label>
-			<input type="email" id="email" bind:value={email} required />
-		</div>
-
-		<div class="field">
-			<label for="password">Password</label>
-			<input type="password" id="password" bind:value={password} required />
-		</div>
-
-		<div class="field">
-			<label for="name">Display Name (Optional)</label>
-			<input type="text" id="name" bind:value={name} placeholder="e.g. John Doe" />
-		</div>
-
-		<div class="field">
-			<label for="username">Username (Optional)</label>
-			<input
-				type="text"
-				id="username"
-				bind:value={username}
-				placeholder="Unique username (min 6 chars)"
-			/>
-			<small>Used for friend invites. Must be alphanumeric.</small>
-		</div>
+		<input type="email" placeholder="Email" bind:value={email} required disabled={loading} />
+		<input
+			type="password"
+			placeholder="Password"
+			bind:value={password}
+			required
+			disabled={loading}
+		/>
+		<input
+			type="text"
+			placeholder="Display Name (Optional)"
+			bind:value={name}
+			disabled={loading}
+		/>
+		<input
+			type="text"
+			placeholder="Username (Optional)"
+			bind:value={username}
+			disabled={loading}
+		/>
+		<small class="hint">Username is used for friend invites. Must be alphanumeric, min 6 chars.</small>
 
 		{#if error}
 			<p class="error">{error}</p>
@@ -97,37 +93,155 @@
 		</button>
 	</form>
 
-	<p>Already have an account? <a href="/signin">Sign In</a></p>
+	<p class="signin-link">Already have an account? <a href="/signin">Sign In</a></p>
 </div>
 
-<style>
-	.auth-container {
-		max-width: 400px;
-		margin: 2rem auto;
-		padding: 1rem;
-	}
-	.field {
-		margin-bottom: 1rem;
-	}
-	label {
-		display: block;
-		margin-bottom: 0.5rem;
-	}
-	input {
-		width: 100%;
-		padding: 0.5rem;
-	}
-	.error {
-		color: red;
-	}
-	.divider {
+<style lang="scss">
+	.container {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		padding: 2rem 1rem 4rem;
+		max-width: 500px;
+		margin: 0 auto;
 		text-align: center;
-		margin: 1rem 0;
+		gap: 1rem;
+		min-height: calc(100svh - 10rem);
 	}
-	.social-auth button {
+
+	h1 {
+		font-size: 2.5rem;
+		margin: 0;
+		line-height: 0.9;
+	}
+
+	.social-auth {
 		width: 100%;
-		padding: 0.5rem;
-		background: #eee;
-		border: 1px solid #ccc;
+		max-width: 350px;
+
+		button {
+			width: 100%;
+			padding: 0.75rem 1rem;
+			font-size: 1.2rem;
+			background-color: #eeeeee;
+			color: #333333;
+			border: none;
+			border-radius: 4px;
+			cursor: pointer;
+			font-weight: bold;
+			transition:
+				transform 0.1s,
+				opacity 0.2s;
+			box-shadow: 0 4px 0 #999999;
+			-webkit-tap-highlight-color: transparent;
+
+			&:hover {
+				opacity: 0.9;
+			}
+
+			&:active {
+				transform: translateY(4px);
+				box-shadow: none;
+			}
+		}
+	}
+
+	.divider {
+		color: #bbbbbb;
+		font-size: 0.9rem;
+		margin: 0.5rem 0;
+	}
+
+	form {
+		display: flex;
+		flex-direction: column;
+		gap: 1.25rem;
+		width: 100%;
+		max-width: 350px;
+
+		input {
+			padding: 0.75rem 1rem;
+			font-size: 1.2rem;
+			border: 1px solid #cccccc;
+			border-radius: 4px;
+			width: 100%;
+			box-sizing: border-box;
+			background-color: transparent;
+			color: #eeeeee;
+			outline: none;
+
+			&::placeholder {
+				color: #bbbbbb;
+				opacity: 1;
+			}
+
+			&:focus {
+				border-color: #aaaaaa;
+				color: #ffffff;
+				box-shadow: none;
+			}
+
+			&:disabled {
+				opacity: 0.65;
+			}
+		}
+
+		button {
+			padding: 0.75rem 1rem;
+			font-size: 1.2rem;
+			background-color: #eeeeee;
+			color: #333333;
+			border: none;
+			border-radius: 4px;
+			cursor: pointer;
+			font-weight: bold;
+			transition:
+				transform 0.1s,
+				opacity 0.2s;
+			box-shadow: 0 4px 0 #999999;
+			-webkit-tap-highlight-color: transparent;
+
+			&:disabled {
+				opacity: 0.65;
+				cursor: not-allowed;
+			}
+
+			&:active:not(:disabled) {
+				transform: translateY(4px);
+				box-shadow: none;
+			}
+
+			&:hover:not(:disabled) {
+				opacity: 0.9;
+			}
+		}
+	}
+
+	.hint {
+		color: #999999;
+		font-size: 0.85rem;
+		margin-top: -0.5rem;
+	}
+
+	.error {
+		color: #ff6f6f;
+		font-size: 1rem;
+		margin: 0;
+	}
+
+	.signin-link {
+		font-size: 1rem;
+		color: #bbbbbb;
+		margin-top: 1rem;
+
+		a {
+			color: #eeeeee;
+			text-decoration: underline;
+
+			&:hover {
+				color: #ffffff;
+			}
+		}
 	}
 </style>
