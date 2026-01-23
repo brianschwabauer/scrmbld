@@ -16,6 +16,12 @@ export function initAuth(d1: D1Database, env: any) {
 				...schema,
 			},
 		}),
+		account: {
+			accountLinking: {
+				enabled: true,
+				trustedProviders: ['google'],
+			},
+		},
 		emailAndPassword: {
 			enabled: true,
 		},
