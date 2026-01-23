@@ -26,7 +26,7 @@
 		<input
 			type="text"
 			name="name"
-			placeholder="Display Name"
+			placeholder="Display Name (optional)"
 			bind:value={name}
 			disabled={saving}
 		/>
@@ -34,11 +34,10 @@
 		<input
 			type="text"
 			name="username"
-			placeholder="Username"
+			placeholder="Username (optional)"
 			bind:value={username}
 			disabled={saving}
 		/>
-		<small class="hint">Used for friend invites. Must be alphanumeric, min 6 characters.</small>
 
 		{#if form?.error}
 			<p class="error">{form.error}</p>
@@ -162,12 +161,6 @@
 				}
 			}
 		}
-	}
-
-	.hint {
-		color: #888888;
-		font-size: 0.85rem;
-		margin-top: -0.5rem;
 	}
 
 	.error {
