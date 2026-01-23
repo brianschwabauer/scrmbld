@@ -1,14 +1,13 @@
 <script lang="ts">
-	import { signIn } from '$lib/auth-client';
+	import { signIn, signUp } from '$lib/auth-client';
 	import { goto } from '$app/navigation';
 
 	let email = $state('');
 	let password = $state('');
 	let loading = $state(false);
 	let error = $state('');
-	let magicLinkSent = $state(false);
 
-	async function handleSignIn() {
+	async function handleContinue() {
 		if (!email || !password) {
 			error = 'Email and password are required';
 			return;
@@ -17,47 +16,45 @@
 		loading = true;
 		error = '';
 
-		try {
-			const { data, error: err } = await signIn.email({
-				email,
-				password,
-			});
+		// First, try to sign in
+		const { data: signInData, error: signInErr } = await signIn.email({
+			email,
+			password,
+		});
 
-			if (err) {
-				error = err.message || 'Sign in failed';
-			} else {
-				goto('/account');
-			}
-		} catch (e) {
-			error = 'An unexpected error occurred';
-		} finally {
-			loading = false;
-		}
-	}
-
-	async function handleMagicLink() {
-		if (!email) {
-			error = 'Please enter your email to send a magic link';
+		if (signInData) {
+			// Successful sign in
+			goto('/account');
 			return;
 		}
-		loading = true;
-		error = '';
-		try {
-			const { error: err } = await signIn.magicLink({
+
+		// If sign in failed, check if it's because user doesn't exist
+		if (signInErr?.message?.toLowerCase().includes('user') ||
+			signInErr?.message?.toLowerCase().includes('invalid') ||
+			signInErr?.message?.toLowerCase().includes('credentials')) {
+
+			// Try to create account
+			const { data: signUpData, error: signUpErr } = await signUp.email({
 				email,
-				callbackURL: '/account',
+				password,
+				name: '',
 			});
-			if (err) {
-				error = err.message;
-			} else {
-				magicLinkSent = true;
-				error = '';
+
+			if (signUpData) {
+				// New account created, redirect to setup
+				goto('/account/setup');
+				return;
 			}
-		} catch (e) {
-			error = 'Failed to send magic link';
-		} finally {
-			loading = false;
+
+			if (signUpErr) {
+				// If signup also failed, it's likely invalid credentials for existing user
+				error = 'Invalid email or password';
+			}
+		} else {
+			error = signInErr?.message || 'An error occurred';
 		}
+
+		loading = false;
 	}
 
 	async function handleGoogle() {
@@ -68,51 +65,51 @@
 <div class="container">
 	<h1>Sign In</h1>
 
-	<div class="social-auth">
-		<button type="button" onclick={handleGoogle}>Sign in with Google</button>
+	<div class="options">
+		<button type="button" class="option-btn" onclick={handleGoogle}>
+			Sign in with Google
+		</button>
+
+		<a href="/signin/magic-link" class="option-btn secondary">
+			Email me a login link
+		</a>
 	</div>
 
-	<div class="divider">OR</div>
+	<div class="divider">
+		<span>or use email</span>
+	</div>
 
-	{#if magicLinkSent}
-		<div class="success">
-			<p>Check your email ({email}) for a magic link to sign in!</p>
-			<button type="button" onclick={() => (magicLinkSent = false)}>Use Password Instead</button>
-		</div>
-	{:else}
-		<form
-			onsubmit={(e) => {
-				e.preventDefault();
-				handleSignIn();
-			}}
-		>
-			<input type="email" placeholder="Email" bind:value={email} required disabled={loading} />
-			<input
-				type="password"
-				placeholder="Password (optional for Magic Link)"
-				bind:value={password}
-				disabled={loading}
-			/>
+	<form
+		onsubmit={(e) => {
+			e.preventDefault();
+			handleContinue();
+		}}
+	>
+		<input
+			type="email"
+			placeholder="Email"
+			bind:value={email}
+			required
+			disabled={loading}
+		/>
+		<input
+			type="password"
+			placeholder="Password"
+			bind:value={password}
+			required
+			disabled={loading}
+		/>
 
-			{#if error}
-				<p class="error">{error}</p>
-			{/if}
+		{#if error}
+			<p class="error">{error}</p>
+		{/if}
 
-			<div class="actions">
-				<button type="submit" disabled={loading}>Sign In</button>
-				<button
-					type="button"
-					class="secondary"
-					onclick={handleMagicLink}
-					disabled={loading || !email}
-				>
-					Magic Link
-				</button>
-			</div>
-		</form>
-	{/if}
+		<button type="submit" disabled={loading}>
+			{loading ? 'Please wait...' : 'Continue'}
+		</button>
+	</form>
 
-	<p class="signup-link">Don't have an account? <a href="/signup">Sign Up</a></p>
+	<a href="/forgot-password" class="forgot-link">Forgot password?</a>
 </div>
 
 <style lang="scss">
@@ -135,73 +132,50 @@
 		line-height: 0.9;
 	}
 
-	.social-auth {
+	.options {
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
 		width: 100%;
 		max-width: 350px;
-
-		button {
-			width: 100%;
-			padding: 0.75rem 1rem;
-			font-size: 1.2rem;
-			background-color: #eeeeee;
-			color: #333333;
-			border: none;
-			border-radius: 4px;
-			cursor: pointer;
-			font-weight: bold;
-			transition:
-				transform 0.1s,
-				opacity 0.2s;
-			box-shadow: 0 4px 0 #999999;
-			-webkit-tap-highlight-color: transparent;
-
-			&:hover {
-				opacity: 0.9;
-			}
-
-			&:active {
-				transform: translateY(4px);
-				box-shadow: none;
-			}
-		}
 	}
 
-	.divider {
-		color: #bbbbbb;
-		font-size: 0.9rem;
-		margin: 0.5rem 0;
-	}
-
-	.success {
-		background-color: rgba(2, 207, 183, 0.15);
-		border: 1px solid #02cfb7;
-		padding: 1.5rem;
+	.option-btn {
+		display: block;
+		width: 100%;
+		padding: 0.75rem 1rem;
+		font-size: 1.1rem;
+		background-color: #eeeeee;
+		color: #333333;
+		border: none;
 		border-radius: 4px;
-		width: 100%;
-		max-width: 350px;
+		cursor: pointer;
+		font-weight: bold;
+		text-decoration: none;
+		text-align: center;
+		box-sizing: border-box;
+		transition:
+			transform 0.1s,
+			opacity 0.2s;
+		box-shadow: 0 4px 0 #999999;
+		-webkit-tap-highlight-color: transparent;
 
-		p {
-			color: #02cfb7;
-			margin: 0 0 1rem;
-			font-size: 1rem;
+		&:hover {
+			opacity: 0.9;
 		}
 
-		button {
-			padding: 0.75rem 1rem;
-			font-size: 1rem;
+		&:active {
+			transform: translateY(4px);
+			box-shadow: none;
+		}
+
+		&.secondary {
 			background-color: transparent;
 			color: #eeeeee;
 			border: 1px solid #cccccc;
-			border-radius: 4px;
-			cursor: pointer;
-			font-weight: bold;
-			transition:
-				transform 0.1s,
-				opacity 0.2s;
-			-webkit-tap-highlight-color: transparent;
+			box-shadow: none;
 
 			&:hover {
-				opacity: 0.9;
 				border-color: #eeeeee;
 			}
 
@@ -211,16 +185,38 @@
 		}
 	}
 
+	.divider {
+		display: flex;
+		align-items: center;
+		width: 100%;
+		max-width: 350px;
+		margin: 0.5rem 0;
+
+		&::before,
+		&::after {
+			content: '';
+			flex: 1;
+			height: 1px;
+			background-color: #555555;
+		}
+
+		span {
+			padding: 0 1rem;
+			color: #999999;
+			font-size: 0.85rem;
+		}
+	}
+
 	form {
 		display: flex;
 		flex-direction: column;
-		gap: 1.25rem;
+		gap: 1rem;
 		width: 100%;
 		max-width: 350px;
 
 		input {
 			padding: 0.75rem 1rem;
-			font-size: 1.2rem;
+			font-size: 1.1rem;
 			border: 1px solid #cccccc;
 			border-radius: 4px;
 			width: 100%;
@@ -244,14 +240,8 @@
 				opacity: 0.65;
 			}
 		}
-	}
-
-	.actions {
-		display: flex;
-		gap: 1rem;
 
 		button {
-			flex: 1;
 			padding: 0.75rem 1rem;
 			font-size: 1.1rem;
 			background-color: #eeeeee;
@@ -279,42 +269,22 @@
 			&:hover:not(:disabled) {
 				opacity: 0.9;
 			}
-
-			&.secondary {
-				background-color: transparent;
-				color: #eeeeee;
-				border: 1px solid #cccccc;
-				box-shadow: none;
-
-				&:hover:not(:disabled) {
-					border-color: #eeeeee;
-				}
-
-				&:active:not(:disabled) {
-					transform: translateY(2px);
-				}
-			}
 		}
 	}
 
 	.error {
 		color: #ff6f6f;
-		font-size: 1rem;
+		font-size: 0.95rem;
 		margin: 0;
 	}
 
-	.signup-link {
-		font-size: 1rem;
-		color: #bbbbbb;
-		margin-top: 1rem;
+	.forgot-link {
+		font-size: 0.9rem;
+		color: #999999;
+		margin-top: 0.5rem;
 
-		a {
+		&:hover {
 			color: #eeeeee;
-			text-decoration: underline;
-
-			&:hover {
-				color: #ffffff;
-			}
 		}
 	}
 </style>

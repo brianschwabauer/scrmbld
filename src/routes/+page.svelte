@@ -12,7 +12,7 @@
 		<div class="actions">
 			<a class="primary" href="/play">Play Now</a>
 			<a href="/help">How to Play</a>
-			<a href="/signup">Sign Up</a>
+			<a href="/signin">Sign In</a>
 		</div>
 	</section>
 </article>
