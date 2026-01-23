@@ -53,5 +53,8 @@ export function initAuth(d1: D1Database, env: any) {
 			},
 		},
 		trustedOrigins: [env.BETTER_AUTH_URL || 'http://localhost:5173'],
+		advanced: {
+			cookiePrefix: 'scrmbld-auth',
+		},
 	});
 }
