@@ -38,6 +38,7 @@
 	let showProfileSuccess = $state(false);
 	let showFriendsSuccess = $state(false);
 	let showHistorySuccess = $state(false);
+	let historyMessage = $state('');
 
 	function showSuccessFor(section: 'profile' | 'history' | 'friends') {
 		if (section === 'profile') showProfileSuccess = true;
@@ -113,7 +114,7 @@
 		{/if}
 	</section>
 
-	{#if data.hasAnonHistory}
+	{#if data.hasAnonHistory || showHistorySuccess}
 		<section>
 			<h2>Game History</h2>
 			<p>You have game history on this device that isn't linked to your account yet.</p>
@@ -122,9 +123,10 @@
 				action="?/claimHistory"
 				use:enhance={() => {
 					lastAction = 'history';
-					return async ({ result, update }) => {
-						await update({ reset: false });
+					return async ({ result }) => {
 						if (result.type === 'success' && result.data?.success) {
+							historyMessage =
+								(result.data.message as string) || 'Successfully linked your game history.';
 							showSuccessFor('history');
 						}
 					};
@@ -132,10 +134,8 @@
 			>
 				<button type="submit" class="secondary">Link History to My Account</button>
 			</form>
-			{#if showHistorySuccess && form?.message}
-				<p class="success">{form.message}</p>
-			{:else if form?.error && lastAction === 'history'}
-				<p class="error">{form.error}</p>
+			{#if showHistorySuccess}
+				<p class="success">{historyMessage}</p>
 			{/if}
 		</section>
 	{/if}
