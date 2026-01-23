@@ -100,9 +100,9 @@
 			<div class="field">
 				<label for="profile">Profile Privacy</label>
 				<select id="profile" name="profile" bind:value={profile}>
-					<option value="public">Public</option>
-					<option value="friends">Friends Only</option>
-					<option value="private">Private</option>
+					<option value="public" selected={privacySettings.profile === 'public'}>Public</option>
+					<option value="friends" selected={privacySettings.profile === 'friends'}>Friends Only</option>
+					<option value="private" selected={privacySettings.profile === 'private'}>Private</option>
 				</select>
 			</div>
 			<button type="submit" disabled={!hasChanges}>Save Changes</button>
