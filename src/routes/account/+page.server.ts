@@ -172,14 +172,32 @@ export const actions = {
 		const formData = await request.formData();
 		const profile = formData.get('profile') as string;
 		const showName = formData.get('showName') === 'on';
-		const name = formData.get('name') as string;
+		const name = (formData.get('name') as string)?.trim() || '';
+		const newUsername = (formData.get('username') as string)?.trim().toLowerCase() || '';
 
 		const db = createDb(platform.env.D1);
+
+		// Validate username if provided
+		if (newUsername) {
+			if (!/^[a-zA-Z0-9]{6,}$/.test(newUsername)) {
+				return { success: false, error: 'Username must be at least 6 alphanumeric characters' };
+			}
+
+			// Check if username is taken by another user
+			const existing = await db.query.user.findFirst({
+				where: eq(user.username, newUsername),
+			});
+
+			if (existing && existing.id !== session.user.id) {
+				return { success: false, error: 'Username is already taken' };
+			}
+		}
 
 		await db
 			.update(user)
 			.set({
 				name,
+				username: newUsername || null,
 				privacySettings: JSON.stringify({ profile, show_name: showName }),
 			})
 			.where(eq(user.id, session.user.id));
