@@ -134,7 +134,7 @@
 					};
 				}}
 			>
-				<button type="submit" class="secondary">Link History to My Account</button>
+				<button type="submit">Link History to My Account</button>
 			</form>
 			{#if showHistorySuccess}
 				<p class="success">{historyMessage}</p>
@@ -258,8 +258,8 @@
 	.sign-out {
 		padding: 0.5rem 1rem;
 		font-size: 0.9rem;
-		background-color: transparent;
-		color: #999999;
+		background-color: rgba(255, 255, 255, 0.05);
+		color: #dddddd;
 		border: 1px solid #666666;
 		border-radius: 4px;
 		cursor: pointer;
@@ -270,6 +270,7 @@
 		&:hover {
 			color: #eeeeee;
 			border-color: #999999;
+			background-color: rgba(255, 255, 255, 0.1);
 		}
 	}
 
@@ -383,21 +384,6 @@
 		&:active:not(:disabled) {
 			transform: translateY(4px);
 			box-shadow: none;
-		}
-
-		&.secondary {
-			background-color: transparent;
-			color: #eeeeee;
-			border: 1px solid #666666;
-			box-shadow: none;
-
-			&:hover {
-				border-color: #999999;
-			}
-
-			&:active {
-				transform: translateY(2px);
-			}
 		}
 
 		&.small {
