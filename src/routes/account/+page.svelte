@@ -443,9 +443,10 @@
 	.badge {
 		background-color: #444444;
 		color: #bbbbbb;
-		padding: 0.15rem 0.5rem;
+		padding: 0.35rem;
 		border-radius: 4px;
 		font-size: 0.75rem;
+		text-box: trim-both cap alphabetic;
 
 		&.pending {
 			background-color: rgba(255, 193, 7, 0.2);
