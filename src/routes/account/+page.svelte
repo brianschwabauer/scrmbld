@@ -414,7 +414,7 @@
 		justify-content: space-between;
 		align-items: center;
 		padding: 0.75rem 0;
-		border-bottom: 1px solid #333333;
+		border-bottom: 1px solid #707070;
 
 		&:last-child {
 			border-bottom: none;
