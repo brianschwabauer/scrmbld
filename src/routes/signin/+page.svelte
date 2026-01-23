@@ -64,6 +64,7 @@
 
 <div class="container">
 	<h1>Sign In</h1>
+	<p class="subtitle">or create an account</p>
 
 	<div class="options">
 		<button type="button" class="option-btn" onclick={handleGoogle}>
@@ -94,17 +95,19 @@
 		/>
 		<input
 			type="password"
-			placeholder="Password"
+			placeholder="Password (choose one if new)"
 			bind:value={password}
 			required
+			minlength="8"
 			disabled={loading}
 		/>
+		<small class="hint">Minimum 8 characters</small>
 
 		{#if error}
 			<p class="error">{error}</p>
 		{/if}
 
-		<button type="submit" disabled={loading}>
+		<button type="submit" disabled={loading || !email || password.length < 8}>
 			{loading ? 'Please wait...' : 'Continue'}
 		</button>
 	</form>
@@ -130,6 +133,12 @@
 		font-size: 2.5rem;
 		margin: 0;
 		line-height: 0.9;
+	}
+
+	.subtitle {
+		color: #999999;
+		font-size: 1.1rem;
+		margin: 0;
 	}
 
 	.options {
@@ -252,12 +261,17 @@
 			font-weight: bold;
 			transition:
 				transform 0.1s,
-				opacity 0.2s;
+				opacity 0.2s,
+				background-color 0.2s,
+				color 0.2s,
+				box-shadow 0.2s;
 			box-shadow: 0 4px 0 #999999;
 			-webkit-tap-highlight-color: transparent;
 
 			&:disabled {
-				opacity: 0.65;
+				background-color: #555555;
+				color: #888888;
+				box-shadow: 0 4px 0 #333333;
 				cursor: not-allowed;
 			}
 
@@ -270,6 +284,12 @@
 				opacity: 0.9;
 			}
 		}
+	}
+
+	.hint {
+		color: #777777;
+		font-size: 0.8rem;
+		margin-top: -0.5rem;
 	}
 
 	.error {
