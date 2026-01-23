@@ -1,0 +1,14 @@
+import { initAuth } from '$lib/server/auth';
+
+export const load = async ({ request, platform }) => {
+	if (!platform?.env?.D1) return { isSignedIn: false };
+
+	const auth = initAuth(platform.env.D1, platform.env);
+	const session = await auth.api.getSession({
+		headers: request.headers,
+	});
+
+	return {
+		isSignedIn: !!session,
+	};
+};
