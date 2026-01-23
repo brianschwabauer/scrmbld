@@ -12,7 +12,11 @@
 		<div class="actions">
 			<a class="primary" href="/play">Play Now</a>
 			<a href="/help">How to Play</a>
-			<a href="/signin">Sign In</a>
+			{#if data.isSignedIn}
+				<a href="/account">My Account</a>
+			{:else}
+				<a href="/signin">Sign In</a>
+			{/if}
 		</div>
 	</section>
 </article>
