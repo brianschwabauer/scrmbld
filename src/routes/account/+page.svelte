@@ -101,7 +101,9 @@
 				<label for="profile">Profile Privacy</label>
 				<select id="profile" name="profile" bind:value={profile}>
 					<option value="public" selected={privacySettings.profile === 'public'}>Public</option>
-					<option value="friends" selected={privacySettings.profile === 'friends'}>Friends Only</option>
+					<option value="friends" selected={privacySettings.profile === 'friends'}
+						>Friends Only</option
+					>
 					<option value="private" selected={privacySettings.profile === 'private'}>Private</option>
 				</select>
 			</div>
@@ -142,33 +144,33 @@
 
 	<section>
 		<h2>Friends</h2>
-		<div class="friends-list">
-			{#each data.friends as friend}
-				<div class="friend-item">
-					<div class="info">
-						<strong>{friend.friendUsername}</strong>
-						{#if friend.status === 'pending'}
-							<span class="badge pending">Pending</span>
-						{/if}
-					</div>
+		{#if data.friends?.length}
+			<div class="friends-list">
+				{#each data.friends as friend}
+					<div class="friend-item">
+						<div class="info">
+							<strong>{friend.friendUsername}</strong>
+							{#if friend.status === 'pending'}
+								<span class="badge pending">Pending</span>
+							{/if}
+						</div>
 
-					<div class="actions">
-						{#if friend.status === 'pending' && friend.initiatorId !== data.user?.id}
-							<form method="POST" action="?/acceptFriend" use:enhance>
+						<div class="actions">
+							{#if friend.status === 'pending' && friend.initiatorId !== data.user?.id}
+								<form method="POST" action="?/acceptFriend" use:enhance>
+									<input type="hidden" name="friendshipId" value={friend.friendshipId} />
+									<button type="submit" class="small">Accept</button>
+								</form>
+							{/if}
+							<form method="POST" action="?/removeFriend" use:enhance>
 								<input type="hidden" name="friendshipId" value={friend.friendshipId} />
-								<button type="submit" class="small">Accept</button>
+								<button type="submit" class="small danger">Remove</button>
 							</form>
-						{/if}
-						<form method="POST" action="?/removeFriend" use:enhance>
-							<input type="hidden" name="friendshipId" value={friend.friendshipId} />
-							<button type="submit" class="small danger">Remove</button>
-						</form>
+						</div>
 					</div>
-				</div>
-			{:else}
-				<p class="empty">No friends yet.</p>
-			{/each}
-		</div>
+				{/each}
+			</div>
+		{/if}
 
 		<h3>Add Friend</h3>
 		<form
