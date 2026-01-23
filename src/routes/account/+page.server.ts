@@ -70,6 +70,9 @@ export const actions = {
 			.where(and(eq(gameplay.userUuid, anonUuid), isNull(gameplay.userId)))
 			.returning({ id: gameplay.id });
 
+		// Delete the cookie so the section won't show again
+		cookies.delete('scrmbld_user_uuid', { path: '/' });
+
 		return {
 			success: true,
 			count: result.length,
