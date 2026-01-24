@@ -168,7 +168,8 @@
 		border-radius: 4px;
 		cursor: pointer;
 		font-weight: 600;
-		transition: opacity 0.15s, transform 0.1s;
+		transition: transform 0.1s, opacity 0.15s;
+		box-shadow: 0 3px 0 #019a87;
 		-webkit-tap-highlight-color: transparent;
 
 		&:hover:not(:disabled) {
@@ -176,7 +177,8 @@
 		}
 
 		&:active:not(:disabled) {
-			transform: scale(0.98);
+			transform: translateY(3px);
+			box-shadow: none;
 		}
 
 		&:disabled {
@@ -188,15 +190,21 @@
 			background-color: transparent;
 			color: #888888;
 			border: 1px solid #555555;
+			box-shadow: none;
 
 			&:hover:not(:disabled) {
 				border-color: #ff6f6f;
 				color: #ff6f6f;
 			}
+
+			&:active:not(:disabled) {
+				transform: translateY(2px);
+			}
 		}
 
 		&.accept {
 			background-color: #02cfb7;
+			box-shadow: 0 3px 0 #019a87;
 		}
 	}
 
