@@ -10,119 +10,166 @@
 	}
 </script>
 
-<div class="profile-container">
+<div class="container">
 	<header>
-		<div class="avatar-placeholder">{data.profileUser.username[0].toUpperCase()}</div>
-		<div>
-			<h1>{data.profileUser.username}</h1>
-			{#if data.profileUser.name}
-				<p class="name">{data.profileUser.name}</p>
-			{/if}
-		</div>
+		{#if data.profileUser.name}
+			<h1>{data.profileUser.name}</h1>
+			<p class="username">@{data.profileUser.username}</p>
+		{:else}
+			<h1>@{data.profileUser.username}</h1>
+		{/if}
 	</header>
 
 	<div class="stats-grid">
 		<div class="stat-card">
-			<h3>Average Time</h3>
-			<p class="value">{formatDuration(data.stats.averageTime)}</p>
+			<span class="label">Average Time</span>
+			<span class="value">{formatDuration(data.stats.averageTime)}</span>
 		</div>
 		<div class="stat-card">
-			<h3>Wins This Month</h3>
-			<p class="value">{data.stats.winsThisMonth}</p>
+			<span class="label">Wins This Month</span>
+			<span class="value">{data.stats.winsThisMonth}</span>
 		</div>
 		<div class="stat-card">
-			<h3>Total Games</h3>
-			<p class="value">{data.stats.history.length}</p>
+			<span class="label">Total Games</span>
+			<span class="value">{data.stats.history.length}</span>
 		</div>
 	</div>
 
-	<section class="chart-section">
-		<h3>Activity</h3>
-		<div class="history-grid">
-			{#each data.stats.history as game}
-				<div class="day-cell" title="Day {game.day}: {formatDuration(Number(game.time))}">
-					<div
-						class="bar"
-						style="height: {Math.min(100, Math.max(10, 100 - (Number(game.time) / 300000) * 100))}%"
-					></div>
-				</div>
-			{/each}
-		</div>
-	</section>
+	{#if data.stats.history.length > 0}
+		<section class="activity-section">
+			<h2>Activity</h2>
+			<div class="history-grid">
+				{#each data.stats.history as game}
+					<div class="day-cell" title="Day {game.day}: {formatDuration(Number(game.time))}">
+						<div
+							class="bar"
+							style="height: {Math.min(100, Math.max(10, 100 - (Number(game.time) / 300000) * 100))}%"
+						></div>
+					</div>
+				{/each}
+			</div>
+		</section>
+	{/if}
 </div>
 
-<style>
-	.profile-container {
-		max-width: 800px;
-		margin: 2rem auto;
-		padding: 1rem;
+<style lang="scss">
+	.container {
+		max-width: 600px;
+		margin: 0 auto;
+		padding: 2rem 1rem 4rem;
 	}
+
 	header {
-		display: flex;
-		gap: 1rem;
-		align-items: center;
+		text-align: center;
 		margin-bottom: 2rem;
 	}
-	.avatar-placeholder {
-		width: 64px;
-		height: 64px;
-		background: #eee;
-		border-radius: 50%;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		font-size: 2rem;
-		font-weight: bold;
-	}
+
 	h1 {
+		font-size: 2rem;
 		margin: 0;
+		color: #eeeeee;
+		line-height: 1.2;
+
+		@media (min-width: 480px) {
+			font-size: 2.5rem;
+		}
 	}
-	.name {
-		margin: 0;
-		color: #666;
+
+	.username {
+		font-size: 1.1rem;
+		color: #888888;
+		margin: 0.25rem 0 0;
 	}
 
 	.stats-grid {
 		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-		gap: 1rem;
+		grid-template-columns: 1fr;
+		gap: 0.75rem;
 		margin-bottom: 2rem;
+
+		@media (min-width: 400px) {
+			grid-template-columns: repeat(3, 1fr);
+		}
 	}
+
 	.stat-card {
-		background: #f9f9f9;
-		padding: 1.5rem;
+		background-color: rgba(255, 255, 255, 0.03);
+		border: 1px solid #444444;
 		border-radius: 8px;
-		text-align: center;
+		padding: 1rem;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 0.25rem;
+
+		.label {
+			font-size: 0.8rem;
+			color: #888888;
+			text-transform: uppercase;
+			letter-spacing: 0.5px;
+		}
+
+		.value {
+			font-size: 1.5rem;
+			font-weight: bold;
+			color: #eeeeee;
+
+			@media (min-width: 400px) {
+				font-size: 1.75rem;
+			}
+		}
 	}
-	.stat-card h3 {
-		margin: 0 0 0.5rem 0;
-		font-size: 0.9rem;
-		color: #666;
-	}
-	.stat-card .value {
-		font-size: 2rem;
-		font-weight: bold;
-		margin: 0;
+
+	.activity-section {
+		h2 {
+			font-size: 1.1rem;
+			color: #bbbbbb;
+			margin: 0 0 1rem;
+			font-weight: normal;
+		}
 	}
 
 	.history-grid {
 		display: flex;
 		align-items: flex-end;
 		gap: 2px;
-		height: 100px;
+		height: 80px;
 		overflow-x: auto;
-		padding-bottom: 10px;
+		padding-bottom: 0.5rem;
+		scrollbar-width: thin;
+		scrollbar-color: #444444 transparent;
+
+		&::-webkit-scrollbar {
+			height: 6px;
+		}
+
+		&::-webkit-scrollbar-track {
+			background: transparent;
+		}
+
+		&::-webkit-scrollbar-thumb {
+			background-color: #444444;
+			border-radius: 3px;
+		}
 	}
+
 	.day-cell {
-		width: 10px;
-		height: 100px;
-		background: transparent;
+		min-width: 8px;
+		width: 8px;
+		height: 80px;
 		display: flex;
 		align-items: flex-end;
+		flex-shrink: 0;
 	}
+
 	.bar {
 		width: 100%;
-		background: #4caf50;
+		background-color: #02cfb7;
 		border-radius: 2px 2px 0 0;
+		transition: opacity 0.15s;
+
+		&:hover {
+			opacity: 0.8;
+		}
 	}
 </style>

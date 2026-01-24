@@ -101,7 +101,7 @@ export const load = async ({ params, platform, request }) => {
 	return {
 		profileUser: {
 			username: targetUser.username,
-			name: settings.show_name ? targetUser.name : null,
+			name: targetUser.name || null,
 			isSelf,
 		},
 		stats: {
