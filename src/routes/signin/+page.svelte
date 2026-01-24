@@ -35,15 +35,17 @@
 		}
 
 		// If sign in failed, check if it's because user doesn't exist
-		if (signInErr?.message?.toLowerCase().includes('user') ||
+		if (
+			signInErr?.message?.toLowerCase().includes('user') ||
 			signInErr?.message?.toLowerCase().includes('invalid') ||
-			signInErr?.message?.toLowerCase().includes('credentials')) {
-
+			signInErr?.message?.toLowerCase().includes('credentials')
+		) {
 			// Try to create account
 			const { data: signUpData, error: signUpErr } = await signUp.email({
 				email,
 				password,
 				name: '',
+				callbackURL: '/account/setup',
 			});
 
 			if (signUpData) {
@@ -73,11 +75,12 @@
 	<p class="subtitle">or create an account</p>
 
 	<div class="options">
-		<button type="button" class="option-btn" onclick={handleGoogle}>
-			Sign in with Google
-		</button>
+		<button type="button" class="option-btn" onclick={handleGoogle}> Sign in with Google </button>
 
-		<a href={data.fromResults ? '/signin/magic-link?from=results' : '/signin/magic-link'} class="option-btn secondary">
+		<a
+			href={data.fromResults ? '/signin/magic-link?from=results' : '/signin/magic-link'}
+			class="option-btn secondary"
+		>
 			Email me a login link
 		</a>
 	</div>
@@ -92,13 +95,7 @@
 			handleContinue();
 		}}
 	>
-		<input
-			type="email"
-			placeholder="Email"
-			bind:value={email}
-			required
-			disabled={loading}
-		/>
+		<input type="email" placeholder="Email" bind:value={email} required disabled={loading} />
 		<input
 			type="password"
 			placeholder="Password (choose one if new)"
