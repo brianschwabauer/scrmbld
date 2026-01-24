@@ -2,8 +2,13 @@
 	import { enhance } from '$app/forms';
 	import { signIn, signOut } from '$lib/auth-client';
 	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
+	import BottomNav from '$lib/BottomNav.svelte';
 
 	let { data, form } = $props();
+
+	// Get layout data for bottom nav
+	const layoutData = $derived(page.data);
 
 	// Derived account info
 	let hasGoogle = $derived(data.linkedAccounts?.some((a: { providerId: string }) => a.providerId === 'google'));
@@ -61,11 +66,10 @@
 	}
 
 	// Track which section had the last action for showing feedback
-	let lastAction = $state<'profile' | 'history' | 'friends' | 'security' | null>(null);
+	let lastAction = $state<'profile' | 'history' | 'security' | null>(null);
 
 	// Auto-hide success messages after 5 seconds
 	let showProfileSuccess = $state(false);
-	let showFriendsSuccess = $state(false);
 	let showHistorySuccess = $state(false);
 	let historyMessage = $state('');
 
@@ -80,15 +84,13 @@
 		}
 	});
 
-	function showSuccessFor(section: 'profile' | 'history' | 'friends') {
+	function showSuccessFor(section: 'profile' | 'history') {
 		if (section === 'profile') showProfileSuccess = true;
 		else if (section === 'history') showHistorySuccess = true;
-		else if (section === 'friends') showFriendsSuccess = true;
 
 		setTimeout(() => {
 			if (section === 'profile') showProfileSuccess = false;
 			else if (section === 'history') showHistorySuccess = false;
-			else if (section === 'friends') showFriendsSuccess = false;
 		}, 5000);
 	}
 </script>
@@ -441,84 +443,13 @@
 		</section>
 	{/if}
 
-	<section>
-		<h2>Friends</h2>
-		{#if data.friends?.length}
-			<div class="friends-list">
-				{#each data.friends as friend}
-					<div class="friend-item">
-						<div class="info">
-							<strong>{friend.friendUsername}</strong>
-							{#if friend.status === 'pending'}
-								<span class="badge pending">Pending</span>
-							{/if}
-						</div>
-
-						<div class="actions">
-							{#if friend.status === 'pending' && friend.initiatorId !== data.user?.id}
-								<form method="POST" action="?/acceptFriend" use:enhance>
-									<input type="hidden" name="friendshipId" value={friend.friendshipId} />
-									<button type="submit" class="small">Accept</button>
-								</form>
-							{/if}
-							<form method="POST" action="?/removeFriend" use:enhance>
-								<input type="hidden" name="friendshipId" value={friend.friendshipId} />
-								<button
-									type="submit"
-									class="icon-btn danger"
-									aria-label={friend.status === 'pending'
-										? 'Remove friend invite'
-										: 'Remove friend'}
-									title={friend.status === 'pending' ? 'Remove friend invite' : 'Remove friend'}
-								>
-									<svg
-										xmlns="http://www.w3.org/2000/svg"
-										width="22"
-										height="22"
-										viewBox="0 0 24 24"
-										fill="none"
-										stroke="currentColor"
-										stroke-width="2"
-										stroke-linecap="round"
-										stroke-linejoin="round"
-									>
-										<path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" /><path
-											d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"
-										/>
-									</svg>
-								</button>
-							</form>
-						</div>
-					</div>
-				{/each}
-			</div>
-		{/if}
-
-		<h3>Add Friend</h3>
-		<form
-			method="POST"
-			action="?/sendFriendRequest"
-			use:enhance={() => {
-				lastAction = 'friends';
-				return async ({ result, update }) => {
-					await update({ reset: false });
-					if (result.type === 'success' && result.data?.success) {
-						showSuccessFor('friends');
-					}
-				};
-			}}
-			class="add-friend"
-		>
-			<input type="text" name="username" placeholder="Username" required />
-			<button type="submit">Send Invite</button>
-		</form>
-		{#if showFriendsSuccess}
-			<p class="success">Friend request sent!</p>
-		{:else if form?.error && lastAction === 'friends'}
-			<p class="error">{form.error}</p>
-		{/if}
-	</section>
 </div>
+
+<BottomNav
+	userId={layoutData.session?.user?.id}
+	username={layoutData.session?.user?.username}
+	todayGameplayId={layoutData.todayGameplayId}
+/>
 
 <style lang="scss">
 	.import-banner {
@@ -535,7 +466,7 @@
 	.container {
 		display: flex;
 		flex-direction: column;
-		padding: 2rem 1rem 4rem;
+		padding: 2rem 1rem calc(5rem + env(safe-area-inset-bottom));
 		max-width: 500px;
 		margin: 0 auto;
 		gap: 1.5rem;
@@ -764,42 +695,6 @@
 		}
 	}
 
-	.friends-list {
-		display: flex;
-		flex-direction: column;
-	}
-
-	.friend-item {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		padding: 0.75rem 0;
-		border-bottom: 1px solid #707070;
-
-		&:last-child {
-			border-bottom: none;
-		}
-
-		.info {
-			display: flex;
-			align-items: center;
-			gap: 0.5rem;
-
-			strong {
-				color: #eeeeee;
-			}
-		}
-
-		.actions {
-			display: flex;
-			gap: 0.5rem;
-
-			form {
-				flex-direction: row;
-			}
-		}
-	}
-
 	.badge {
 		background-color: #444444;
 		color: #bbbbbb;
@@ -906,19 +801,6 @@
 
 		&:active:not(:disabled) {
 			transform: translateY(2px);
-		}
-	}
-
-	.add-friend {
-		flex-direction: row;
-		gap: 0.75rem;
-
-		input {
-			flex: 1;
-		}
-
-		button {
-			flex-shrink: 0;
 		}
 	}
 
