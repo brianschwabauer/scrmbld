@@ -142,6 +142,11 @@
 
 		&.has-nav {
 			padding-bottom: calc(5rem + env(safe-area-inset-bottom));
+
+			@media (min-width: 768px) {
+				padding-bottom: 4rem;
+				margin-left: max(auto, calc(50% - 300px + 60px));
+			}
 		}
 	}
 

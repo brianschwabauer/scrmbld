@@ -112,6 +112,22 @@
 		padding: 0.5rem 0;
 		padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
 		z-index: 100;
+
+		// Desktop: floating vertical nav in top left
+		@media (min-width: 768px) {
+			top: 1rem;
+			left: 1rem;
+			bottom: auto;
+			right: auto;
+			flex-direction: column;
+			justify-content: flex-start;
+			gap: 0.25rem;
+			padding: 0.5rem;
+			border-radius: 12px;
+			border: 1px solid #444444;
+			background-color: rgba(51, 51, 51, 0.95);
+			backdrop-filter: blur(10px);
+		}
 	}
 
 	a {
@@ -123,7 +139,9 @@
 		color: #888888;
 		padding: 0.25rem 0.75rem;
 		border-radius: 8px;
-		transition: color 0.15s;
+		transition:
+			color 0.15s,
+			background-color 0.15s;
 		-webkit-tap-highlight-color: transparent;
 
 		span {
@@ -138,10 +156,20 @@
 
 		&:hover {
 			color: #bbbbbb;
+
+			@media (min-width: 768px) {
+				background-color: rgba(255, 255, 255, 0.05);
+			}
 		}
 
 		&.active {
 			color: #02cfb7;
+		}
+
+		// Desktop: slightly larger touch targets
+		@media (min-width: 768px) {
+			padding: 0.5rem 0.75rem;
+			aspect-ratio: 1 / 1;
 		}
 	}
 </style>

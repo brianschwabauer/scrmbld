@@ -121,6 +121,11 @@
 		max-width: 500px;
 		margin: 0 auto;
 		gap: 1rem;
+
+		@media (min-width: 768px) {
+			padding: 2rem 1rem;
+			margin-left: max(auto, calc(50% - 250px + 60px));
+		}
 	}
 
 	h1 {
