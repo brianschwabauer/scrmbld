@@ -310,7 +310,7 @@
 		</button>
 	{/if}
 
-	{#if !data.isSignedIn}
+	{#if !data.session}
 		<div class="account-link">
 			<a href="/signin?from=results" class="button secondary">Sign In to Save Progress</a>
 		</div>
