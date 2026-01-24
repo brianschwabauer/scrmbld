@@ -495,6 +495,19 @@
 		</div>
 	{:else}
 		<button
+			class="back-btn"
+			onclick={() => history.back()}
+			use:ripple
+			title="Go back"
+			aria-label="Go back"
+			in:slide={{ axis: 'y', easing: quartOut, duration: 300 }}
+			out:slide={{ axis: 'y', easing: backIn, duration: 150 }}
+		>
+			<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+				<path d="m15 18-6-6 6-6"/>
+			</svg>
+		</button>
+		<button
 			class="mute"
 			onpointerdown={() => {
 				muted = !muted;
@@ -539,6 +552,25 @@
 </article>
 
 <style lang="scss">
+	.back-btn {
+		position: fixed;
+		bottom: 1rem;
+		left: 1rem;
+		background-color: rgba(255, 255, 255, 0.05);
+		color: #dddddd;
+		padding: 0;
+		border-radius: 999px;
+		text-align: center;
+		z-index: 1;
+		backdrop-filter: blur(10px);
+		width: 4rem;
+		height: 4rem;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		box-sizing: border-box;
+	}
+
 	article {
 		display: flex;
 		flex-direction: column;
