@@ -1,7 +1,12 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
+	import { page } from '$app/state';
+	import BottomNav from '$lib/BottomNav.svelte';
 
 	let { data, form } = $props();
+
+	// Get layout data for bottom nav
+	const layoutData = $derived(page.data);
 
 	let loading = $state(false);
 
@@ -14,7 +19,7 @@
 	}
 </script>
 
-<div class="container">
+<div class="container" class:has-nav={layoutData.session}>
 	<header>
 		{#if data.profileUser.name}
 			<h1>{data.profileUser.name}</h1>
@@ -121,11 +126,23 @@
 	{/if}
 </div>
 
+{#if layoutData.session}
+	<BottomNav
+		userId={layoutData.session?.user?.id}
+		username={layoutData.session?.user?.username}
+		todayGameplayId={layoutData.todayGameplayId}
+	/>
+{/if}
+
 <style lang="scss">
 	.container {
 		max-width: 600px;
 		margin: 0 auto;
 		padding: 2rem 1rem 4rem;
+
+		&.has-nav {
+			padding-bottom: calc(5rem + env(safe-area-inset-bottom));
+		}
 	}
 
 	header {

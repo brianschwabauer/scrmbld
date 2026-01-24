@@ -4,11 +4,15 @@
 	import { page } from '$app/state';
 	import Expand from '$lib/Expand.svelte';
 	import FlipText from '$lib/FlipText.svelte';
+	import BottomNav from '$lib/BottomNav.svelte';
 	import { tooltip } from '$lib/tootltip';
 	import Confetti from 'svelte-confetti';
 	import { SvelteSet } from 'svelte/reactivity';
 
 	const { data } = $props();
+
+	// Get layout data for bottom nav
+	const layoutData = $derived(page.data);
 	const copiedTextToClipboard = new SvelteSet<string>();
 	let shareButtonEl = $state<HTMLButtonElement | undefined>(undefined);
 	let showConfetti = $state(false);
@@ -110,7 +114,7 @@
 	});
 </script>
 
-<article>
+<article class:has-nav={layoutData.session}>
 	{#if showConfetti}
 		<!-- <div class="confetti">
 			<Confetti
@@ -306,14 +310,20 @@
 		</button>
 	{/if}
 
-	<div class="account-link">
-		{#if data.isSignedIn}
-			<a href="/account" class="button secondary">My Account</a>
-		{:else}
+	{#if !data.isSignedIn}
+		<div class="account-link">
 			<a href="/signin?from=results" class="button secondary">Sign In to Save Progress</a>
-		{/if}
-	</div>
+		</div>
+	{/if}
 </article>
+
+{#if layoutData.session}
+	<BottomNav
+		userId={layoutData.session?.user?.id}
+		username={layoutData.session?.user?.username}
+		todayGameplayId={layoutData.todayGameplayId}
+	/>
+{/if}
 
 <style>
 	/* .confetti {
@@ -338,6 +348,9 @@
 			:global(.my-time) {
 				font-size: 3.5rem;
 			}
+		}
+		&.has-nav {
+			padding-bottom: calc(5rem + env(safe-area-inset-bottom));
 		}
 	}
 	h1 {
