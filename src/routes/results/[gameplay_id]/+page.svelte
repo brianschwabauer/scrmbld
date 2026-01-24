@@ -351,6 +351,10 @@
 		}
 		&.has-nav {
 			padding-bottom: calc(5rem + env(safe-area-inset-bottom));
+
+			@media (min-width: 768px) {
+				padding-bottom: 1rem;
+			}
 		}
 	}
 	h1 {
