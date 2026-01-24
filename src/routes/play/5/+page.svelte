@@ -10,40 +10,44 @@
 	import { tooltip } from '$lib/tootltip.js';
 	import { untrack } from 'svelte';
 	import { Confetti } from 'svelte-confetti';
-	import { quartInOut } from 'svelte/easing';
-	import { type TransitionConfig } from 'svelte/transition';
+	import { backIn, quartInOut, quartOut } from 'svelte/easing';
+	import { slide, type TransitionConfig } from 'svelte/transition';
+	import { SvelteSet } from 'svelte/reactivity';
 
 	const { data } = $props();
 	const words = $derived(data.words);
 	const today = $derived(new Date().setHours(0, 0, 0, 0));
-	const todaysWord = $derived(words.findLast(({ day }) => today >= day) || words[0]);
+	const todaysWord = $derived((words || []).findLast(({ day }) => today >= day) || words[0]);
 	const answer = $derived(todaysWord.word[0].toUpperCase());
 	const random = randomNumberGenerator();
 	let mixletters = $state(todaysWord.word.slice(1));
 	let inputEl = $state<HTMLInputElement | undefined>(undefined);
 	let answerEl = $state<HTMLDivElement | undefined>(undefined);
 	let shuffling = $state(false);
-	let scrambled = $state(shuffle(false));
+	let scrambled = $state(shuffle());
 	let attempt = $state('');
 	let selectionStart = $state(0);
 	let selectionEnd = $state(0);
 	let times = $state<number[][]>([]);
 	let hintLetters = $state(0);
 	let wasKeyboardInput = $state(false);
+	let muted = $state(data.mutedPreference ?? false);
 	const success = $derived(!!answer && attempt === answer);
 	const time = $derived(
 		times.reduce((total, [start, end]) => {
 			return total + Math.max(0, Math.round((end - start) / 1000));
-		}, 0)
+		}, 0),
 	); // number of seconds since the start of the game
+
 	let didCopyToClipboard = $state(false);
 	let shareButtonEl = $state<HTMLButtonElement | undefined>(undefined);
 	const useNativeShare = $derived(
 		browser &&
 			typeof navigator !== undefined &&
 			'share' in navigator &&
-			!navigator.userAgent.includes('Windows')
+			!navigator.userAgent.includes('Windows'),
 	);
+
 	const timeDisplay = $derived.by(() => {
 		const hours = Math.floor(time / 3600);
 		const minutes = Math.floor((time % 3600) / 60);
@@ -55,33 +59,42 @@
 		}
 		return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 	});
+
+	// The indexes of the letters that have been clicked on in the scrambled word
+	// This is used to show the correct 'usedLetters' when a user clicks a second instance of a letter
+	// This isn't necessary for when the user uses the keyboard to type because we can just show the first instance as 'used'
+	const clickedLetterIndexes = new SvelteSet<number>();
+
+	// Determine the used letters based on the attempt and the scrambled word
 	const usedLetters = $derived.by(() => {
 		const letterIndexes = new Set<number>();
 		attempt.split('').forEach((letter, i) => {
-			let index: number | undefined;
-			while (index === undefined || index > -1 || index >= scrambled.length - 1) {
-				index = scrambled.indexOf(letter, (index ?? -1) + 1);
-				if (index > -1 && !letterIndexes.has(index)) {
-					letterIndexes.add(index);
-					break;
-				}
-			}
+			untrack(() => {
+				const occurrences = scrambled
+					.split('')
+					.map((l, j) => (l === letter ? j : -1))
+					.filter((j) => j > -1 && !letterIndexes.has(j))
+					.sort((a, b) => +clickedLetterIndexes.has(b) - +clickedLetterIndexes.has(a));
+				if (occurrences.length) letterIndexes.add(occurrences[0]);
+			});
 		});
 		return letterIndexes;
 	});
 	const numHintsUsed = $derived(
-		Math.max(0, Math.min(5, todaysWord.word.slice(1).length - mixletters.length + hintLetters))
+		Math.max(0, Math.min(5, todaysWord.word.slice(1).length - mixletters.length + hintLetters)),
 	);
 	const shareURL = `https://scrmbld.app`;
 	const shareText = $derived(
-		`🆂🅲🆁🅼🅱🅻🅳`.slice(0, numHintsUsed * 2) + `🅂🄲🅁🄼🄱🄻🄳`.slice(numHintsUsed * 2) + ` ➄ ${timeDisplay}`
+		`🆂🅲🆁🅼🅱🅻🅳`.slice(0, numHintsUsed * 2) +
+			`🅂🄲🅁🄼🄱🄻🄳`.slice(numHintsUsed * 2) +
+			` ➄ ${timeDisplay}`,
 	);
 
 	function openNativeShare() {
 		if (!useNativeShare || typeof navigator === 'undefined' || !navigator.share) return;
 		navigator.share({
 			title: '🅂🄲🅁🄼🄱🄻🄳',
-			text: shareText
+			text: shareText,
 			// url: shareURL
 		});
 	}
@@ -109,31 +122,8 @@
 		}, 5000);
 	}
 
-	const audioEffects = browser
-		? [{ start: 0, end: 2.5, audio: new Audio(`${assets}/splitflap.mp3`) }]
-		: [];
-	audioEffects.forEach((effect) => effect.audio.load());
-	function playSoundEffect(effect: number) {
-		if (!audioEffects[effect]) return;
-		const audio = audioEffects[effect].audio;
-		const isPlaying =
-			audio.currentTime > 0 && !audio.paused && !audio.ended && audio.readyState > 2;
-		if (isPlaying) return;
-		audio.currentTime = audioEffects[effect].start;
-		audio.play();
-		const cb = () => {
-			if (audio.currentTime >= audioEffects[effect].end) {
-				audio.pause();
-				audio.removeEventListener('timeupdate', cb);
-			}
-		};
-		audio.addEventListener('timeupdate', cb);
-	}
-	$effect(() => playSoundEffect(0));
-
-	function shuffle(playSound = true) {
+	function shuffle() {
 		shuffling = true;
-		if (playSound) playSoundEffect(0);
 		setTimeout(() => {
 			shuffling = false;
 		}, 1500);
@@ -170,7 +160,7 @@
 		}
 		if (e.key === 'ArrowRight') {
 			selectionEnd = Math.min(selectionEnd + 1, 5, attempt.length - hintLetters);
-			selectionStart = Math.min(selectionEnd, 6);
+			selectionStart = Math.min(selectionEnd, 4);
 			inputEl.setSelectionRange(selectionStart, selectionEnd);
 			return;
 		}
@@ -181,7 +171,7 @@
 				attempt.slice(hintLetters, hintLetters + selectionStart) +
 				attempt.slice(hintLetters + selectionEnd)
 			).slice(0, 5);
-			if (selectionStart < 6) selectionStart++;
+			if (selectionStart < 4) selectionStart++;
 			selectionEnd = selectionStart;
 			inputEl.setSelectionRange(selectionStart, selectionEnd);
 			return;
@@ -194,7 +184,7 @@
 			key +
 			attempt.slice(hintLetters + selectionEnd)
 		).slice(0, 5);
-		if (selectionStart < 6) selectionStart++;
+		if (selectionStart < 4) selectionStart++;
 		selectionEnd = selectionStart;
 		inputEl.setSelectionRange(selectionStart, selectionEnd);
 	}
@@ -208,17 +198,18 @@
 					width: calc(var(--width) * ${t});
 					opacity: ${t};
 				`;
-			}
+			},
 		};
 	}
 
-	// Focus the input element to open up the keyboard on mobile
+	// Clear the clickedLetterIndexes set when letters that were previously clicked are no longer in the attempt
 	$effect(() => {
-		if (!inputEl) return;
-		setTimeout(() => {
-			if (!inputEl) return;
-			inputEl.focus();
-		}, 2500);
+		const attemptLength = attempt.length;
+		untrack(() => {
+			Array.from(clickedLetterIndexes).forEach((i) => {
+				if (attemptLength <= i) clickedLetterIndexes.delete(i);
+			});
+		});
 	});
 
 	$effect(() => {
@@ -226,6 +217,14 @@
 		if (answer && attempt === answer) {
 			if (times[times.length - 1]) times[times.length - 1][1] = Date.now();
 			clearInterval(interval);
+			localStorage.setItem(
+				`scrmbld_5_${todaysWord.day}`,
+				JSON.stringify({
+					...todaysWord,
+					times,
+					success: true,
+				}),
+			);
 		}
 	});
 
@@ -238,12 +237,12 @@
 					{ transform: 'translate3d(7px, 0, 0)' },
 					{ transform: 'translate3d(-15px, 0, 0)' },
 					{ transform: 'translate3d(15px, 0, 0)' },
-					{ transform: 'translate3d(0px, 0, 0)' }
+					{ transform: 'translate3d(0px, 0, 0)' },
 				],
 				{
 					easing: 'ease-in-out',
-					duration: 350
-				}
+					duration: 350,
+				},
 			);
 		}
 	});
@@ -252,6 +251,16 @@
 	$effect(() => {
 		clearInterval(interval);
 		if (success) return;
+		if (!times.length) {
+			try {
+				const savedInfo = JSON.parse(localStorage.getItem(`scrmbld_5_${todaysWord.day}`) || '');
+				if (savedInfo && savedInfo.times?.length && !savedInfo.success) {
+					times = savedInfo.times;
+				}
+			} catch (error) {
+				// ignore
+			}
+		}
 		untrack(() => {
 			setTimeout(() => {
 				if (!times.length) {
@@ -266,6 +275,14 @@
 					} else {
 						times[times.length - 1][1] = now;
 					}
+					localStorage.setItem(
+						`scrmbld_5_${todaysWord.day}`,
+						JSON.stringify({
+							...todaysWord,
+							times,
+							success,
+						}),
+					);
 				}, 1000);
 			}, 1500);
 		});
@@ -295,7 +312,7 @@
 				class="hint"
 				word={answer.slice(0, hintLetters)}
 				duration={wasKeyboardInput ? 100 : 150}
-				onlyAnimateOneLetter={wasKeyboardInput}
+				sound={!muted}
 				success
 				minLength={hintLetters}
 			/>
@@ -303,9 +320,10 @@
 		<FlipText
 			word={attempt.slice(hintLetters)}
 			duration={wasKeyboardInput ? 100 : 150}
+			sound={!muted}
+			volume={0.75}
 			{selectionEnd}
 			{selectionStart}
-			onlyAnimateOneLetter={wasKeyboardInput}
 			{success}
 			error={attempt.length === answer.length && !success}
 			minLength={answer.length - hintLetters}
@@ -318,7 +336,7 @@
 			onkeyup={(e) => {
 				const target = e.target as HTMLInputElement;
 				selectionEnd = Math.min(target.selectionEnd as number, 5);
-				selectionStart = Math.min(target.selectionStart as number, selectionEnd, 6);
+				selectionStart = Math.min(target.selectionStart as number, selectionEnd, 4);
 				if (selectionStart === selectionEnd && selectionStart === 0) {
 					selectionEnd = 1;
 					inputEl?.setSelectionRange(selectionStart, selectionEnd);
@@ -333,7 +351,7 @@
 				const numberOfInvaidChars = value.length - newValue.length;
 				newValue = newValue.slice(0, 5);
 				selectionEnd = Math.min(selectionEnd - numberOfInvaidChars, 5);
-				selectionStart = Math.min(selectionStart - numberOfInvaidChars, selectionEnd, 6);
+				selectionStart = Math.min(selectionStart - numberOfInvaidChars, selectionEnd, 4);
 				attempt = (answer.slice(0, hintLetters) + newValue).slice(0, 5);
 				if (newValue !== value) {
 					target.value = attempt;
@@ -343,16 +361,13 @@
 			onselectionchange={(e) => {
 				const target = e.target as HTMLInputElement;
 				selectionEnd = Math.min(target.selectionEnd as number, 5);
-				selectionStart = Math.min(target.selectionStart as number, selectionEnd, 6);
+				selectionStart = Math.min(target.selectionStart as number, selectionEnd, 4);
 				if (selectionStart === selectionEnd && selectionStart === 0) {
 					selectionEnd = 1;
 					inputEl?.setSelectionRange(selectionStart, selectionEnd);
 				}
 			}}
 		/>
-	</div>
-	<div class="question">
-		<FlipText word={scrambled} {usedLetters} duration={350} minLength={5} />
 	</div>
 	<div class="actions">
 		{#if success}
@@ -362,7 +377,7 @@
 					attempt = '';
 					times = [];
 					hintLetters = 0;
-					if (inputEl) inputEl.focus();
+					localStorage.removeItem(`scrmbld_5_${todaysWord.day}`);
 				}}>Reset</button
 			>
 		{:else}
@@ -370,7 +385,6 @@
 				disabled={shuffling}
 				onclick={() => {
 					scrambled = shuffle();
-					if (inputEl) inputEl.focus();
 				}}
 				use:ripple>Shuffle</button
 			>
@@ -380,6 +394,8 @@
 				word={timeDisplay}
 				minLength={4}
 				duration={200}
+				sound={!muted}
+				volume={0.65}
 				alphabet={[
 					'',
 					'@',
@@ -397,12 +413,14 @@
 					'6',
 					'7',
 					'8',
-					'9'
+					'9',
 				]}
 			/>
 		</div>
 		{#if success}
-			<button class="primary" onclick={openNativeShare} bind:this={shareButtonEl}>Share</button>
+			<button class="primary" onclick={openNativeShare} bind:this={shareButtonEl} use:ripple
+				>Share</button
+			>
 			{#if !useNativeShare}
 				<Popover refElement={shareButtonEl} openOnClick>
 					<div class="share-popover">
@@ -449,7 +467,6 @@
 			<button
 				onclick={() => {
 					applyHint();
-					if (inputEl) inputEl.focus();
 				}}
 				use:ripple
 				class="hint"
@@ -467,17 +484,107 @@
 			</button>
 		{/if}
 	</div>
-	<Keyboard
-		onclick={(key) => {
-			if (key === 'Clear') {
-				attempt = '';
-				selectionStart = 0;
-				selectionEnd = 0;
-				return;
-			}
-			window.dispatchEvent(new KeyboardEvent('keyup', { key, detail: 1 }));
-		}}
-	></Keyboard>
+	<div class="question">
+		<FlipText
+			word={scrambled}
+			{usedLetters}
+			duration={350}
+			sound={!muted}
+			onclick={(i) => {
+				if (usedLetters.has(i)) return;
+				if (attempt.length >= answer.length) return;
+				const letter = scrambled[i];
+				clickedLetterIndexes.add(i);
+				attempt += letter;
+				setTimeout(() => {
+					if (inputEl) {
+						selectionStart = attempt.length;
+						selectionEnd = selectionStart;
+						inputEl.setSelectionRange(selectionStart, selectionEnd);
+					}
+				}, 0);
+			}}
+		/>
+	</div>
+
+	{#if attempt.length > hintLetters}
+		<div
+			class="bottom-actions"
+			in:slide={{ axis: 'y', easing: quartOut, duration: 300 }}
+			out:slide={{ axis: 'y', easing: backIn, duration: 150 }}
+		>
+			<button
+				onpointerdown={() => {
+					attempt = attempt.slice(0, -1);
+				}}
+				use:ripple
+			>
+				<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
+					><path
+						fill="currentColor"
+						d="m11.4 16l2.6-2.6l2.6 2.6l1.4-1.4l-2.6-2.6L18 9.4L16.6 8L14 10.6L11.4 8L10 9.4l2.6 2.6l-2.6 2.6zM9 20q-.475 0-.9-.213t-.7-.587L2 12l5.4-7.2q.275-.375.7-.587T9 4h11q.825 0 1.413.587T22 6v12q0 .825-.587 1.413T20 20z"
+					/></svg
+				>
+				Backspace
+			</button>
+			<button
+				onpointerdown={() => {
+					attempt = hintLetters ? answer.slice(0, hintLetters) : '';
+				}}
+				use:ripple
+			>
+				<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
+					><path
+						fill="currentColor"
+						d="m8.4 17l3.6-3.6l3.6 3.6l1.4-1.4l-3.6-3.6L17 8.4L15.6 7L12 10.6L8.4 7L7 8.4l3.6 3.6L7 15.6zm3.6 5q-2.075 0-3.9-.788t-3.175-2.137T2.788 15.9T2 12t.788-3.9t2.137-3.175T8.1 2.788T12 2t3.9.788t3.175 2.137T21.213 8.1T22 12t-.788 3.9t-2.137 3.175t-3.175 2.138T12 22"
+					/></svg
+				>
+				Clear
+			</button>
+		</div>
+	{:else}
+		<button
+			class="mute"
+			onpointerdown={() => {
+				muted = !muted;
+				document.cookie = `scrmbld_muted=${muted}; path=/`;
+			}}
+			use:ripple
+			title={muted ? 'Unmute' : 'Mute'}
+			in:slide={{ axis: 'y', easing: quartOut, duration: 300 }}
+			out:slide={{ axis: 'y', easing: backIn, duration: 150 }}
+		>
+			{#if muted}
+				<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24"
+					><path
+						fill="currentColor"
+						d="m19.8 22.6l-3.025-3.025q-.625.4-1.325.688t-1.45.462v-2.05q.35-.125.688-.25t.637-.3L12 14.8V20l-5-5H3V9h3.2L1.4 4.2l1.4-1.4l18.4 18.4zm-.2-5.8l-1.45-1.45q.425-.775.638-1.625t.212-1.75q0-2.35-1.375-4.2T14 5.275v-2.05q3.1.7 5.05 3.138T21 11.975q0 1.325-.363 2.55T19.6 16.8m-3.35-3.35L14 11.2V7.95q1.175.55 1.838 1.65T16.5 12q0 .375-.062.738t-.188.712M12 9.2L9.4 6.6L12 4z"
+					/></svg
+				>
+			{:else}
+				<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24"
+					><path
+						fill="currentColor"
+						d="M14 20.725v-2.05q2.25-.65 3.625-2.5t1.375-4.2t-1.375-4.2T14 5.275v-2.05q3.1.7 5.05 3.138T21 11.975t-1.95 5.613T14 20.725M3 15V9h4l5-5v16l-5-5zm11 1V7.95q1.175.55 1.838 1.65T16.5 12q0 1.275-.663 2.363T14 16"
+					/></svg
+				>
+			{/if}
+		</button>
+	{/if}
+
+	<div class="desktop-only" style="margin-top: 1rem;">
+		<Keyboard
+			onclick={(key) => {
+				if (key === 'Clear') {
+					attempt = '';
+					selectionStart = 0;
+					selectionEnd = 0;
+					return;
+				}
+				window.dispatchEvent(new KeyboardEvent('keyup', { key, detail: 1 }));
+			}}
+		></Keyboard>
+	</div>
 </article>
 
 <style lang="scss">
@@ -493,7 +600,7 @@
 		max-width: 100vw;
 		overflow: hidden;
 		min-height: 100vh;
-		padding: 4rem 0;
+		padding: 8svh 0 6vh;
 		@media (min-width: 768px) {
 			justify-content: center;
 			padding: 0;
@@ -505,14 +612,19 @@
 			}
 		}
 	}
+	.desktop-only {
+		display: none;
+		@media (min-width: 769px) and (min-height: 700px) {
+			display: block;
+		}
+	}
 	.actions {
 		display: flex;
 		flex-direction: row;
 		justify-content: center;
 		align-items: center;
 		gap: 1rem;
-		margin-top: 2rem;
-		margin-bottom: 4rem;
+		margin: 4svh 0;
 	}
 	.hint {
 		display: flex;
@@ -572,7 +684,7 @@
 		cursor: pointer;
 		font-size: 1rem;
 		text-decoration: none;
-		border-radius: 999px;
+		border-radius: 4px;
 		padding: 0.5em 1em;
 		margin: 0;
 		font-weight: 500;
@@ -585,6 +697,15 @@
 		font-optical-sizing: auto;
 		font-weight: 400;
 		font-style: normal;
+		touch-action: manipulation;
+		transition:
+			transform 0.07s,
+			opacity 0.2s;
+		box-shadow: 0 4px 0 #333333;
+		&:active {
+			transform: translateY(4px);
+			box-shadow: none;
+		}
 		@media (min-width: 600px) {
 			font-size: 1.5rem;
 		}
@@ -616,26 +737,84 @@
 			font-size: 1rem;
 		}
 	}
+	.mute {
+		position: fixed;
+		bottom: 1rem;
+		right: 1rem;
+		background-color: rgba(255, 255, 255, 0.05);
+		color: #dddddd;
+		padding: 0;
+		border-radius: 999px;
+		text-align: center;
+		z-index: 1;
+		backdrop-filter: blur(10px);
+		width: 4rem;
+		height: 4rem;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		box-sizing: border-box;
+	}
+	.bottom-actions {
+		position: fixed;
+		display: flex;
+		gap: 0.5rem;
+		bottom: 0.5rem;
+		left: 0.5rem;
+		right: 0.5rem;
+		@media (min-width: 769px) {
+			display: none;
+		}
+		@media (min-width: 400px) {
+			gap: 1rem;
+			bottom: 1rem;
+			left: 1rem;
+			right: 1rem;
+		}
+
+		button {
+			background-color: rgba(255, 255, 255, 0.05);
+			color: #dddddd;
+			padding: 0.75rem 0.5rem;
+			border-radius: 4px;
+			text-decoration: none;
+			font-weight: 500;
+			text-align: center;
+			text-wrap: pretty;
+			z-index: 1;
+			backdrop-filter: blur(10px);
+			width: 50%;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			gap: 0.5rem;
+			font-size: 1.2rem;
+			touch-action: manipulation;
+			@media (min-width: 400px) {
+				font-size: 1.5rem;
+				padding: 0.75rem 1rem;
+			}
+		}
+	}
 	.question {
 		display: flex;
 		flex-direction: column;
 		gap: 1rem;
-		font-size: 0.9rem;
-		@media (min-width: 350px) {
-			font-size: 1.35rem;
-		}
-		@media (min-width: 400px) {
-			font-size: 1.5rem;
-		}
-		@media (min-width: 600px) {
-			font-size: 2rem;
-			margin-bottom: 2rem;
-		}
-		@media (min-width: 1200px) and (min-height: 700px) {
-			font-size: 3rem;
-		}
-		@media (min-width: 1600px) and (min-height: 800px) {
-			font-size: 3.5rem;
+		font-size: min(7vmin, 5rem);
+		margin-bottom: 2rem;
+
+		@media (max-width: 768px) {
+			margin-bottom: 0;
+			:global(.flip-text) {
+				display: grid;
+				grid-template-columns: repeat(3, 1fr);
+				grid-template-rows: repeat(2, auto);
+				font-size: 16vmin;
+				margin-top: 2vh;
+			}
+			:global(.flip-text > button) {
+				justify-items: center;
+			}
 		}
 	}
 	.answer {
@@ -643,24 +822,9 @@
 		grid-template-columns: 1fr;
 		grid-template-rows: 1fr;
 		font-size: 1.25rem;
-		margin-bottom: 1.5rem;
-		@media (min-width: 300px) {
-			font-size: 1.5rem;
-		}
-		@media (min-width: 350px) {
-			font-size: 1.75rem;
-		}
-		@media (min-width: 400px) {
-			font-size: 2rem;
-		}
-		@media (min-width: 600px) {
-			font-size: 3rem;
-		}
-		@media (min-width: 1200px) and (min-height: 700px) {
-			font-size: 4rem;
-		}
-		@media (min-width: 1600px) and (min-height: 800px) {
-			font-size: 4.5rem;
+		font-size: min(7vmin, 5rem);
+		@media (max-width: 768px) {
+			pointer-events: none;
 		}
 		:global(.flip-text) {
 			grid-row: 1 / 1;
@@ -724,6 +888,10 @@
 			margin: 0;
 			background-color: #eeeeee;
 			color: #333333;
+			box-shadow: none;
+			&:active {
+				transform: none;
+			}
 			svg,
 			img {
 				width: 1.5rem;
