@@ -74,10 +74,10 @@
 	let historyMessage = $state('');
 
 	// Auto-import success banner
-	let showAutoImportBanner = $state(data.autoImportCount > 0);
+	let showAutoImportBanner = $state((data.autoImportCount ?? 0) > 0);
 
 	$effect(() => {
-		if (data.autoImportCount > 0) {
+		if ((data.autoImportCount ?? 0) > 0) {
 			setTimeout(() => {
 				showAutoImportBanner = false;
 			}, 8000);
@@ -193,7 +193,7 @@
 									};
 								}}>
 									<input type="hidden" name="providerId" value="credential" />
-									<button type="submit" class="icon-btn danger" title="Remove sign-in method">
+									<button type="submit" class="icon-btn danger" title="Remove sign-in method" aria-label="Remove sign-in method">
 										<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
 											<path d="M18 6 6 18"/><path d="m6 6 12 12"/>
 										</svg>
@@ -229,7 +229,7 @@
 									};
 								}}>
 									<input type="hidden" name="providerId" value="google" />
-									<button type="submit" class="icon-btn danger" title="Remove sign-in method">
+									<button type="submit" class="icon-btn danger" title="Remove sign-in method" aria-label="Remove sign-in method">
 										<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
 											<path d="M18 6 6 18"/><path d="m6 6 12 12"/>
 										</svg>
@@ -377,7 +377,7 @@
 						return async ({ result, update }) => {
 							securityLoading = false;
 							if (result.type === 'success' && result.data?.success) {
-								securitySuccess = result.data.message || 'Verification email sent';
+								securitySuccess = (result.data.message as string) || 'Verification email sent';
 								showChangeEmail = false;
 								clearSecurityForms();
 								setTimeout(() => securitySuccess = '', 5000);
@@ -701,12 +701,6 @@
 		padding: 0.35rem;
 		border-radius: 4px;
 		font-size: 0.75rem;
-		text-box: trim-both cap alphabetic;
-
-		&.pending {
-			background-color: rgba(255, 255, 255, 0.4);
-			color: #222222;
-		}
 
 		&.connected {
 			background-color: rgba(2, 207, 183, 0.2);
@@ -802,11 +796,6 @@
 		&:active:not(:disabled) {
 			transform: translateY(2px);
 		}
-	}
-
-	.empty {
-		color: #666666;
-		font-style: italic;
 	}
 
 	.error {

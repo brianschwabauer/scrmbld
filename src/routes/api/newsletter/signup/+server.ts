@@ -16,7 +16,7 @@ export async function POST({ request, getClientAddress, platform }) {
 	if (request.headers.get('Content-Type') !== 'application/json') {
 		throw error(415, 'Must be JSON');
 	}
-	const body = await request.json();
+	const body = (await request.json()) as { email?: string; name?: string };
 	if (!body || typeof body !== 'object') {
 		throw error(400, 'Invalid JSON');
 	}
@@ -32,7 +32,7 @@ export async function POST({ request, getClientAddress, platform }) {
 		.prepare(`SELECT COUNT(*) as count FROM newsletter_signup WHERE email = ?`)
 		.bind(email)
 		.first();
-	if (existing && existing.count > 0) {
+	if (existing && (existing.count as number) > 0) {
 		// Already signed up, return 204 No Content
 		return new Response(null, { status: 204 });
 	}

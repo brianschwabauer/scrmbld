@@ -85,9 +85,7 @@
 	);
 	const shareURL = `https://scrmbld.app`;
 	const shareText = $derived(
-		`🆂🅲🆁🅼🅱🅻🅳`.slice(0, numHintsUsed * 2) +
-			`🅂🄲🅁🄼🄱🄻🄳`.slice(numHintsUsed * 2) +
-			` ➄ ${timeDisplay}`,
+		`🆂🅲🆁🅼🅱🅻🅳`.slice(0, numHintsUsed * 2) + `🅂🄲🅁🄼🄱🄻🄳`.slice(numHintsUsed * 2) + ` ➄ ${timeDisplay}`,
 	);
 
 	function openNativeShare() {
