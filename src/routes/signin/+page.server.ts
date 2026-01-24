@@ -1,7 +1,8 @@
 import { redirect } from '@sveltejs/kit';
 import { initAuth } from '$lib/server/auth';
+import type { PageServerLoad } from './$types';
 
-export const load = async ({ request, platform, url, cookies }) => {
+export const load: PageServerLoad = async ({ request, platform, url, cookies }) => {
 	if (!platform?.env?.D1) return { fromResults: false };
 
 	const auth = initAuth(platform.env.D1, platform.env);
