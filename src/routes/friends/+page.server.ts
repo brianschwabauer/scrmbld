@@ -15,6 +15,9 @@ export const load = async ({ request, platform }) => {
 	if (!session) {
 		throw redirect(302, '/signin');
 	}
+	if (!session.user.emailVerified) {
+		throw redirect(302, '/verify-email');
+	}
 
 	const db = createDb(platform.env.D1);
 

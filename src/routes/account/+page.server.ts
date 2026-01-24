@@ -16,6 +16,11 @@ export const load = async ({ request, cookies, platform, url }) => {
 		throw redirect(302, '/signin');
 	}
 
+	// Check if email is verified - if not, redirect to verification page
+	if (!session.user.emailVerified) {
+		throw redirect(302, '/verify-email');
+	}
+
 	const db = createDb(platform.env.D1);
 
 	// Check if user has anonymous game history to import

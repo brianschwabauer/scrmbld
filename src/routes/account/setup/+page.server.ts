@@ -15,6 +15,9 @@ export const load = async ({ request, platform, url, cookies }) => {
 	if (!session) {
 		throw redirect(302, '/signin');
 	}
+	if (!session.user.emailVerified) {
+		throw redirect(302, '/verify-email');
+	}
 
 	// Check if we should auto-import after setup
 	const shouldImport =
