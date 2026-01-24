@@ -144,8 +144,8 @@
 			padding-bottom: calc(5rem + env(safe-area-inset-bottom));
 
 			@media (min-width: 768px) {
-				padding-bottom: 4rem;
-				margin-left: max(auto, calc(50% - 300px + 60px));
+				padding: 2rem 1rem 4rem calc(1rem + 100px);
+				max-width: 650px;
 			}
 		}
 	}

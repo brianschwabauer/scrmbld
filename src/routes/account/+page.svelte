@@ -472,8 +472,8 @@
 		gap: 1.5rem;
 
 		@media (min-width: 768px) {
-			padding: 2rem 1rem;
-			margin-left: max(auto, calc(50% - 250px + 60px));
+			padding: 2rem 1rem 2rem calc(1rem + 70px);
+			max-width: calc(500px + 70px);
 		}
 	}
 
