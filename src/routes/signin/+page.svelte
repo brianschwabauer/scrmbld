@@ -1,8 +1,9 @@
 <script lang="ts">
 	import { signIn, signUp } from '$lib/auth-client';
 	import { goto } from '$app/navigation';
+	import type { PageData } from './$types';
 
-	const { data } = $props();
+	let { data }: { data: PageData } = $props();
 
 	let email = $state('');
 	let password = $state('');
