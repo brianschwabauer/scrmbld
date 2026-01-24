@@ -11,7 +11,7 @@ export const user = sqliteTable('user', {
 	createdAt: integer('createdAt', { mode: 'timestamp' }).notNull(),
 	updatedAt: integer('updatedAt', { mode: 'timestamp' }).notNull(),
 	username: text('username').unique(),
-	privacySettings: text('privacy_settings'),
+	profileVisibility: text('profile_visibility').default('public'),
 });
 
 export const session = sqliteTable('session', {

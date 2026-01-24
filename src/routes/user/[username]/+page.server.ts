@@ -23,9 +23,7 @@ export const load = async ({ params, platform, request }) => {
 
 	if (!targetUser) throw error(404, 'User not found');
 
-	const settings = targetUser.privacySettings
-		? JSON.parse(targetUser.privacySettings)
-		: { profile: 'public', show_name: false };
+	const profileVisibility = targetUser.profileVisibility || 'public';
 
 	let isAllowed = false;
 	let isSelf = false;
@@ -37,9 +35,9 @@ export const load = async ({ params, platform, request }) => {
 	if (session?.user?.id === targetUser.id) {
 		isAllowed = true;
 		isSelf = true;
-	} else if (settings.profile === 'public') {
+	} else if (profileVisibility === 'public') {
 		isAllowed = true;
-	} else if (settings.profile === 'friends' && session?.user?.id) {
+	} else if (profileVisibility === 'friends' && session?.user?.id) {
 		// Check friendship
 		const f = await db.query.friendship.findFirst({
 			where: and(

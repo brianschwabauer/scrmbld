@@ -47,30 +47,28 @@
 		});
 	}
 
-	let privacySettings = $derived(
-		data.user?.privacySettings ? JSON.parse(data.user.privacySettings) : { profile: 'public' },
-	);
-
 	// Track original values to detect changes
 	let originalUsername = $state(data.user?.username || '');
 	let originalName = $state(data.user?.name || '');
-	let originalProfile = $state(privacySettings.profile);
+	let originalProfileVisibility = $state(data.user?.profileVisibility || 'public');
 
 	// Track form field values
 	let username = $state(data.user?.username || '');
 	let name = $state(data.user?.name || '');
-	let profile = $state(privacySettings.profile);
+	let profileVisibility = $state(data.user?.profileVisibility || 'public');
 
 	// Check if any field has changed from original
 	let hasChanges = $derived(
-		username !== originalUsername || name !== originalName || profile !== originalProfile,
+		username !== originalUsername ||
+			name !== originalName ||
+			profileVisibility !== originalProfileVisibility,
 	);
 
 	// Sync originals after successful save
 	function syncAfterSave() {
 		originalUsername = username;
 		originalName = name;
-		originalProfile = profile;
+		originalProfileVisibility = profileVisibility;
 	}
 
 	// Track which section had the last action for showing feedback
@@ -161,12 +159,10 @@
 			</div>
 			<div class="field">
 				<label for="profile">Profile Privacy</label>
-				<select id="profile" name="profile" bind:value={profile}>
-					<option value="public" selected={privacySettings.profile === 'public'}>Public</option>
-					<option value="friends" selected={privacySettings.profile === 'friends'}
-						>Friends Only</option
-					>
-					<option value="private" selected={privacySettings.profile === 'private'}>Private</option>
+				<select id="profile" name="profile" bind:value={profileVisibility}>
+					<option value="public" selected={profileVisibility === 'public'}>Public</option>
+					<option value="friends" selected={profileVisibility === 'friends'}>Friends Only</option>
+					<option value="private" selected={profileVisibility === 'private'}>Private</option>
 				</select>
 			</div>
 			<button type="submit" disabled={!hasChanges}>Save Changes</button>

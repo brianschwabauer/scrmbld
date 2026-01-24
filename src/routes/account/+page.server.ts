@@ -28,8 +28,7 @@ export const load = async ({ request, cookies, platform, url }) => {
 
 	// Check if we should auto-import (from results page sign-in flow)
 	const shouldAutoImport =
-		url.searchParams.get('import') === 'true' ||
-		cookies.get('scrmbld_import_on_signin') === 'true';
+		url.searchParams.get('import') === 'true' || cookies.get('scrmbld_import_on_signin') === 'true';
 
 	let autoImportCount = 0;
 	if (shouldAutoImport && anonUuid) {
@@ -138,7 +137,7 @@ export const actions = {
 			.set({
 				name,
 				username: newUsername || null,
-				privacySettings: JSON.stringify({ profile }),
+				profileVisibility: profile,
 			})
 			.where(eq(user.id, session.user.id));
 
