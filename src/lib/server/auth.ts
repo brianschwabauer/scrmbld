@@ -7,7 +7,7 @@ import * as schema from './schema';
 
 export function initAuth(d1: D1Database, env: any) {
 	const db = createDb(d1);
-	const resend = new Resend(env.RESEND_API_KEY || 're_123');
+	const resend = new Resend(env.RESEND_API_KEY);
 
 	return betterAuth({
 		database: drizzleAdapter(db, {
