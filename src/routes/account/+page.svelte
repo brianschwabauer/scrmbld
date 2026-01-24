@@ -69,6 +69,17 @@
 	let showHistorySuccess = $state(false);
 	let historyMessage = $state('');
 
+	// Auto-import success banner
+	let showAutoImportBanner = $state(data.autoImportCount > 0);
+
+	$effect(() => {
+		if (data.autoImportCount > 0) {
+			setTimeout(() => {
+				showAutoImportBanner = false;
+			}, 8000);
+		}
+	});
+
 	function showSuccessFor(section: 'profile' | 'history' | 'friends') {
 		if (section === 'profile') showProfileSuccess = true;
 		else if (section === 'history') showHistorySuccess = true;
@@ -83,6 +94,12 @@
 </script>
 
 <div class="container">
+	{#if showAutoImportBanner}
+		<div class="import-banner">
+			Successfully imported {data.autoImportCount} game{data.autoImportCount === 1 ? '' : 's'} to your account!
+		</div>
+	{/if}
+
 	<header>
 		<div class="title">
 			<h1>Account</h1>
@@ -504,6 +521,17 @@
 </div>
 
 <style lang="scss">
+	.import-banner {
+		background-color: rgba(2, 207, 183, 0.15);
+		border: 1px solid #02cfb7;
+		color: #02cfb7;
+		padding: 0.75rem 1rem;
+		border-radius: 6px;
+		text-align: center;
+		font-size: 0.95rem;
+		margin-bottom: 0.5rem;
+	}
+
 	.container {
 		display: flex;
 		flex-direction: column;

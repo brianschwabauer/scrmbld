@@ -4,8 +4,8 @@ import { createDb } from '$lib/server/db';
 import { user } from '$lib/server/schema';
 import { eq } from 'drizzle-orm';
 
-export const load = async ({ request, platform }) => {
-	if (!platform?.env?.D1) return {};
+export const load = async ({ request, platform, url, cookies }) => {
+	if (!platform?.env?.D1) return { shouldImport: false };
 
 	const auth = initAuth(platform.env.D1, platform.env);
 	const session = await auth.api.getSession({
@@ -16,13 +16,18 @@ export const load = async ({ request, platform }) => {
 		throw redirect(302, '/signin');
 	}
 
+	// Check if we should auto-import after setup
+	const shouldImport =
+		url.searchParams.get('import') === 'true' || cookies.get('scrmbld_import_on_signin') === 'true';
+
 	return {
 		user: session.user,
+		shouldImport,
 	};
 };
 
 export const actions = {
-	save: async ({ request, platform }) => {
+	save: async ({ request, platform, url, cookies }) => {
 		if (!platform?.env?.D1) return { success: false, error: 'Database unavailable' };
 
 		const auth = initAuth(platform.env.D1, platform.env);
@@ -33,13 +38,13 @@ export const actions = {
 		const name = (formData.get('name') as string)?.trim() || '';
 		const username = (formData.get('username') as string)?.trim().toLowerCase() || '';
 
+		const db = createDb(platform.env.D1);
+
 		// Validate username if provided
 		if (username) {
 			if (!/^[a-zA-Z0-9]{6,}$/.test(username)) {
 				return { success: false, error: 'Username must be at least 6 alphanumeric characters' };
 			}
-
-			const db = createDb(platform.env.D1);
 
 			// Check if username is taken
 			const existing = await db.query.user.findFirst({
@@ -50,28 +55,31 @@ export const actions = {
 				return { success: false, error: 'Username is already taken' };
 			}
 
-			await db
-				.update(user)
-				.set({ name, username })
-				.where(eq(user.id, session.user.id));
+			await db.update(user).set({ name, username }).where(eq(user.id, session.user.id));
 		} else {
-			const db = createDb(platform.env.D1);
-			await db
-				.update(user)
-				.set({ name })
-				.where(eq(user.id, session.user.id));
+			await db.update(user).set({ name }).where(eq(user.id, session.user.id));
 		}
 
-		throw redirect(302, '/account');
+		// Check if we should auto-import and redirect accordingly
+		const shouldImport =
+			url.searchParams.get('import') === 'true' ||
+			cookies.get('scrmbld_import_on_signin') === 'true';
+
+		throw redirect(302, shouldImport ? '/account?import=true' : '/account');
 	},
 
-	skip: async ({ request, platform }) => {
+	skip: async ({ request, platform, url, cookies }) => {
 		if (!platform?.env?.D1) throw redirect(302, '/account');
 
 		const auth = initAuth(platform.env.D1, platform.env);
 		const session = await auth.api.getSession({ headers: request.headers });
 		if (!session) throw redirect(302, '/signin');
 
-		throw redirect(302, '/account');
+		// Check if we should auto-import and redirect accordingly
+		const shouldImport =
+			url.searchParams.get('import') === 'true' ||
+			cookies.get('scrmbld_import_on_signin') === 'true';
+
+		throw redirect(302, shouldImport ? '/account?import=true' : '/account');
 	},
 };
