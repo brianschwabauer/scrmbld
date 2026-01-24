@@ -1,5 +1,9 @@
 <script lang="ts">
-	let { data } = $props();
+	import { enhance } from '$app/forms';
+
+	let { data, form } = $props();
+
+	let loading = $state(false);
 
 	function formatDuration(ms: number) {
 		if (!ms) return 'N/A';
@@ -17,6 +21,68 @@
 			<p class="username">@{data.profileUser.username}</p>
 		{:else}
 			<h1>@{data.profileUser.username}</h1>
+		{/if}
+
+		{#if data.isSignedIn && !data.profileUser.isSelf}
+			<div class="friend-action">
+				{#if data.friendshipStatus === 'none'}
+					<form
+						method="POST"
+						action="?/addFriend"
+						use:enhance={() => {
+							loading = true;
+							return async ({ update }) => {
+								loading = false;
+								await update();
+							};
+						}}
+					>
+						<button type="submit" class="friend-btn" disabled={loading}>
+							{loading ? 'Sending...' : 'Add Friend'}
+						</button>
+					</form>
+				{:else if data.friendshipStatus === 'pending_sent'}
+					<form
+						method="POST"
+						action="?/cancelRequest"
+						use:enhance={() => {
+							loading = true;
+							return async ({ update }) => {
+								loading = false;
+								await update();
+							};
+						}}
+					>
+						<input type="hidden" name="friendshipId" value={data.friendshipId} />
+						<button type="submit" class="friend-btn pending" disabled={loading}>
+							{loading ? 'Canceling...' : 'Request Sent'}
+						</button>
+					</form>
+				{:else if data.friendshipStatus === 'pending_received'}
+					<form
+						method="POST"
+						action="?/acceptFriend"
+						use:enhance={() => {
+							loading = true;
+							return async ({ update }) => {
+								loading = false;
+								await update();
+							};
+						}}
+					>
+						<input type="hidden" name="friendshipId" value={data.friendshipId} />
+						<button type="submit" class="friend-btn accept" disabled={loading}>
+							{loading ? 'Accepting...' : 'Accept Request'}
+						</button>
+					</form>
+				{:else if data.friendshipStatus === 'accepted'}
+					<span class="friend-badge">Friends</span>
+				{/if}
+
+				{#if form?.error}
+					<p class="error">{form.error}</p>
+				{/if}
+			</div>
 		{/if}
 	</header>
 
@@ -62,6 +128,10 @@
 	header {
 		text-align: center;
 		margin-bottom: 2rem;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 0.25rem;
 	}
 
 	h1 {
@@ -78,7 +148,73 @@
 	.username {
 		font-size: 1.1rem;
 		color: #888888;
-		margin: 0.25rem 0 0;
+		margin: 0;
+	}
+
+	.friend-action {
+		margin-top: 1rem;
+
+		form {
+			display: contents;
+		}
+	}
+
+	.friend-btn {
+		padding: 0.5rem 1.25rem;
+		font-size: 0.95rem;
+		background-color: #02cfb7;
+		color: #111111;
+		border: none;
+		border-radius: 4px;
+		cursor: pointer;
+		font-weight: 600;
+		transition: opacity 0.15s, transform 0.1s;
+		-webkit-tap-highlight-color: transparent;
+
+		&:hover:not(:disabled) {
+			opacity: 0.9;
+		}
+
+		&:active:not(:disabled) {
+			transform: scale(0.98);
+		}
+
+		&:disabled {
+			opacity: 0.6;
+			cursor: not-allowed;
+		}
+
+		&.pending {
+			background-color: transparent;
+			color: #888888;
+			border: 1px solid #555555;
+
+			&:hover:not(:disabled) {
+				border-color: #ff6f6f;
+				color: #ff6f6f;
+			}
+		}
+
+		&.accept {
+			background-color: #02cfb7;
+		}
+	}
+
+	.friend-badge {
+		display: inline-block;
+		padding: 0.5rem 1.25rem;
+		font-size: 0.95rem;
+		background-color: rgba(2, 207, 183, 0.15);
+		color: #02cfb7;
+		border: 1px solid #02cfb7;
+		border-radius: 4px;
+		font-weight: 500;
+	}
+
+	.error {
+		color: #ff6f6f;
+		font-size: 0.85rem;
+		margin: 0.5rem 0 0;
 	}
 
 	.stats-grid {
