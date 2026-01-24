@@ -4,7 +4,7 @@ import { createDb } from '$lib/server/db';
 import { account, friendship, gameplay, user } from '$lib/server/schema';
 import { eq, or, and, isNull, count } from 'drizzle-orm';
 
-export const load = async ({ request, cookies, platform }) => {
+export const load = async ({ request, cookies, platform, url }) => {
 	if (!platform?.env?.D1) return {};
 
 	const auth = initAuth(platform.env.D1, platform.env);
@@ -20,6 +20,30 @@ export const load = async ({ request, cookies, platform }) => {
 
 	// Check if user has anonymous game history to import
 	const anonUuid = cookies.get('scrmbld_user_uuid');
+
+	// Check if we should auto-import (from results page sign-in flow)
+	const shouldAutoImport =
+		url.searchParams.get('import') === 'true' ||
+		cookies.get('scrmbld_import_on_signin') === 'true';
+
+	let autoImportCount = 0;
+	if (shouldAutoImport && anonUuid) {
+		// Auto-import game history
+		const result = await db
+			.update(gameplay)
+			.set({ userId: session.user.id })
+			.where(and(eq(gameplay.userUuid, anonUuid), isNull(gameplay.userId)))
+			.returning({ id: gameplay.id });
+
+		autoImportCount = result.length;
+
+		// Delete the cookies
+		cookies.delete('scrmbld_user_uuid', { path: '/' });
+		cookies.delete('scrmbld_import_on_signin', { path: '/' });
+	} else if (shouldAutoImport) {
+		// Just clear the import cookie if no history to import
+		cookies.delete('scrmbld_import_on_signin', { path: '/' });
+	}
 
 	// Fetch linked accounts (sign-in methods)
 	const linkedAccounts = await db
@@ -50,11 +74,15 @@ export const load = async ({ request, cookies, platform }) => {
 		)
 		.where(or(eq(friendship.userId1, session.user.id), eq(friendship.userId2, session.user.id)));
 
+	// Re-check if there's still history to import (in case auto-import didn't happen)
+	const hasAnonHistory = !shouldAutoImport && !!anonUuid;
+
 	return {
 		user: session.user,
 		friends,
-		hasAnonHistory: !!anonUuid,
+		hasAnonHistory,
 		linkedAccounts,
+		autoImportCount,
 	};
 };
 

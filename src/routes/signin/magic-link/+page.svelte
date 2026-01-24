@@ -1,10 +1,15 @@
 <script lang="ts">
 	import { signIn } from '$lib/auth-client';
 
+	const { data } = $props();
+
 	let email = $state('');
 	let loading = $state(false);
 	let error = $state('');
 	let sent = $state(false);
+
+	// Use import param in callback if coming from results
+	const callbackURL = data.fromResults ? '/account/setup?import=true' : '/account/setup';
 
 	async function handleSendLink() {
 		if (!email) {
@@ -18,7 +23,7 @@
 		try {
 			const { error: err } = await signIn.magicLink({
 				email,
-				callbackURL: '/account/setup',
+				callbackURL,
 			});
 
 			if (err) {
@@ -45,7 +50,7 @@
 			Use a different email
 		</button>
 	{:else}
-		<a href="/signin" class="back-link">&larr; Back</a>
+		<a href={data.fromResults ? '/signin?from=results' : '/signin'} class="back-link">&larr; Back</a>
 
 		<h1>Login link</h1>
 		<p>Enter your email and we'll send you a link to sign in. No password needed.</p>

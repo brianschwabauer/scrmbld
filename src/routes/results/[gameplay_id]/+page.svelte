@@ -305,6 +305,14 @@
 			<small>{shareURL}</small>
 		</button>
 	{/if}
+
+	<div class="account-link">
+		{#if data.isSignedIn}
+			<a href="/account" class="button secondary">My Account</a>
+		{:else}
+			<a href="/signin?from=results" class="button secondary">Sign In to Save Progress</a>
+		{/if}
+	</div>
 </article>
 
 <style>
@@ -420,6 +428,26 @@
 				white-space: nowrap;
 			}
 		}
+		&.secondary {
+			background-color: transparent;
+			color: #bbbbbb;
+			border: 1px solid #555555;
+			box-shadow: none;
+			font-size: 1rem;
+			&:hover {
+				color: #eeeeee;
+				border-color: #888888;
+			}
+			&:active {
+				transform: translateY(2px);
+			}
+		}
+	}
+
+	.account-link {
+		margin-top: 1.5rem;
+		padding-top: 1.5rem;
+		border-top: 1px solid #444444;
 	}
 
 	.streak {

@@ -2,10 +2,16 @@
 	import { signIn, signUp } from '$lib/auth-client';
 	import { goto } from '$app/navigation';
 
+	const { data } = $props();
+
 	let email = $state('');
 	let password = $state('');
 	let loading = $state(false);
 	let error = $state('');
+
+	// Determine redirect URLs based on whether we came from results
+	const accountUrl = data.fromResults ? '/account?import=true' : '/account';
+	const setupUrl = data.fromResults ? '/account/setup?import=true' : '/account/setup';
 
 	async function handleContinue() {
 		if (!email || !password) {
@@ -24,7 +30,7 @@
 
 		if (signInData) {
 			// Successful sign in
-			goto('/account');
+			goto(accountUrl);
 			return;
 		}
 
@@ -42,7 +48,7 @@
 
 			if (signUpData) {
 				// New account created, redirect to setup
-				goto('/account/setup');
+				goto(setupUrl);
 				return;
 			}
 
@@ -58,7 +64,7 @@
 	}
 
 	async function handleGoogle() {
-		await signIn.social({ provider: 'google', callbackURL: '/account' });
+		await signIn.social({ provider: 'google', callbackURL: accountUrl });
 	}
 </script>
 
@@ -71,7 +77,7 @@
 			Sign in with Google
 		</button>
 
-		<a href="/signin/magic-link" class="option-btn secondary">
+		<a href={data.fromResults ? '/signin/magic-link?from=results' : '/signin/magic-link'} class="option-btn secondary">
 			Email me a login link
 		</a>
 	</div>

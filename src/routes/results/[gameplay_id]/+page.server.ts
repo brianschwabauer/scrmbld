@@ -1,7 +1,8 @@
 import { error } from '@sveltejs/kit';
+import { initAuth } from '$lib/server/auth';
 import type { GamePlay } from '../../api/gameplay/gameplay.type';
 
-export async function load({ platform, params, cookies, url }) {
+export async function load({ platform, params, cookies, url, request }) {
 	const D1 = platform?.env?.D1;
 	if (!D1) throw error(500, { message: 'Database not available' });
 
@@ -119,6 +120,16 @@ export async function load({ platform, params, cookies, url }) {
 		}
 	}
 
+	// Check if user is signed in
+	let isSignedIn = false;
+	try {
+		const auth = initAuth(D1, platform.env);
+		const session = await auth.api.getSession({ headers: request.headers });
+		isSignedIn = !!session;
+	} catch {
+		// Ignore auth errors
+	}
+
 	return {
 		day: gameplay.day,
 		word: gameplay.word,
@@ -136,5 +147,6 @@ export async function load({ platform, params, cookies, url }) {
 		fastestTime,
 		numHintsUsed: gameplay.num_hints || 0,
 		isCurrentUser: user_uuid && user_uuid === gameplay.user_uuid,
+		isSignedIn,
 	};
 }
