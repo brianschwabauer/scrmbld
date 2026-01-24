@@ -82,10 +82,10 @@ export function initAuth(d1: D1Database, env: any) {
 		],
 		user: {
 			additionalFields: {
-				privacySettings: {
+				profileVisibility: {
 					type: 'string',
 					required: false,
-					defaultValue: JSON.stringify({ profile: 'public', show_name: false }),
+					defaultValue: 'public',
 				},
 			},
 		},

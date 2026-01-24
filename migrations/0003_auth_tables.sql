@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS user (
     createdAt INTEGER NOT NULL,
     updatedAt INTEGER NOT NULL,
     username TEXT UNIQUE,
-    privacy_settings TEXT
+    profile_visibility TEXT DEFAULT 'public'
 );
 
 -- Session Table
