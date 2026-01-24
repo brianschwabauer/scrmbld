@@ -487,6 +487,7 @@
 	<div class="question">
 		<FlipText
 			word={scrambled}
+			minLength={6}
 			{usedLetters}
 			duration={350}
 			sound={!muted}
