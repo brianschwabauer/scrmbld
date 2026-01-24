@@ -1,7 +1,8 @@
 <!-- svelte-ignore state_referenced_locally -->
 <script lang="ts">
 	import { browser } from '$app/environment';
-	import { assets } from '$app/paths';
+	import { goto } from '$app/navigation';
+	import { page } from '$app/state';
 	import { randomNumberGenerator } from '$lib';
 	import FlipText from '$lib/FlipText.svelte';
 	import Keyboard from '$lib/Keyboard.svelte';
@@ -13,6 +14,62 @@
 	import { SvelteSet } from 'svelte/reactivity';
 
 	const { data } = $props();
+
+	// Get layout data for session info
+	const layoutData = $derived(page.data);
+	const isSignedIn = $derived(!!layoutData.session);
+	const username = $derived(layoutData.session?.user?.username);
+	const userId = $derived(layoutData.session?.user?.id);
+
+	// Smart back navigation - only go back to allowed pages
+	function handleBack() {
+		if (!browser) return;
+
+		const referrer = document.referrer;
+
+		// Check if referrer is from the same origin
+		if (referrer) {
+			try {
+				const referrerUrl = new URL(referrer);
+				const currentUrl = new URL(window.location.href);
+
+				// Only consider same-origin referrers
+				if (referrerUrl.origin === currentUrl.origin) {
+					const path = referrerUrl.pathname;
+
+					// Define allowed paths
+					const allowedPaths = ['/'];
+
+					if (isSignedIn) {
+						allowedPaths.push('/friends', '/account');
+						if (username) allowedPaths.push(`/user/${username}`);
+						if (userId) allowedPaths.push(`/user/${userId}`);
+					}
+
+					// Check if referrer path matches any allowed path
+					const isAllowed = allowedPaths.some(
+						(allowed) => path === allowed || path.startsWith(allowed + '/'),
+					);
+
+					if (isAllowed) {
+						history.back();
+						return;
+					}
+					if (isSignedIn) {
+						if (username) goto(`/user/${username}`);
+						if (userId) goto(`/user/${userId}`);
+						goto('/account');
+						return;
+					}
+				}
+			} catch {
+				// Invalid URL, fall through to default
+			}
+		}
+
+		// Default: go to home page
+		goto('/');
+	}
 	const words = $derived(data.words);
 	const today = $derived(new Date().setHours(0, 0, 0, 0));
 	const todaysWord = $derived((words || []).findLast(({ day }) => today >= day) || words[0]);
@@ -496,15 +553,25 @@
 	{:else}
 		<button
 			class="back-btn"
-			onclick={() => history.back()}
+			onclick={handleBack}
 			use:ripple
 			title="Go back"
 			aria-label="Go back"
 			in:slide={{ axis: 'y', easing: quartOut, duration: 300 }}
 			out:slide={{ axis: 'y', easing: backIn, duration: 150 }}
 		>
-			<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-				<path d="m15 18-6-6 6-6"/>
+			<svg
+				xmlns="http://www.w3.org/2000/svg"
+				width="32"
+				height="32"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2"
+				stroke-linecap="round"
+				stroke-linejoin="round"
+			>
+				<path d="m15 18-6-6 6-6" />
 			</svg>
 		</button>
 		<button
