@@ -134,6 +134,7 @@
 		display: flex;
 		flex-direction: column;
 		align-items: center;
+		justify-content: center;
 		gap: 0.25rem;
 		text-decoration: none;
 		color: #888888;
@@ -164,6 +165,9 @@
 
 		&.active {
 			color: #02cfb7;
+			@media (min-width: 768px) {
+				background-color: rgba(255, 255, 255, 0.05);
+			}
 		}
 
 		// Desktop: slightly larger touch targets
