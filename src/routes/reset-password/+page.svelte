@@ -20,7 +20,7 @@
 		loading = false;
 
 		if (err) {
-			error = err.message;
+			error = err.message ?? 'An error occurred';
 		} else {
 			goto('/signin');
 		}
@@ -36,12 +36,12 @@
 		}}
 	>
 		<div class="field">
-			<label>New Password</label>
-			<input type="password" bind:value={newPassword} required minlength="8" />
+			<label for="new-password">New Password</label>
+			<input id="new-password" type="password" bind:value={newPassword} required minlength="8" />
 		</div>
 		<div class="field">
-			<label>Confirm Password</label>
-			<input type="password" bind:value={confirmPassword} required minlength="8" />
+			<label for="confirm-password">Confirm Password</label>
+			<input id="confirm-password" type="password" bind:value={confirmPassword} required minlength="8" />
 		</div>
 		{#if error}
 			<p class="error">{error}</p>

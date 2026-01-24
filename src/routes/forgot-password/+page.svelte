@@ -7,6 +7,7 @@
 
 	async function handleSubmit() {
 		loading = true;
+		// @ts-expect-error - forgetPassword exists on better-auth client when emailAndPassword is enabled
 		const { error } = await authClient.forgetPassword({
 			email,
 			redirectTo: '/reset-password',
@@ -30,8 +31,8 @@
 		}}
 	>
 		<div class="field">
-			<label>Email</label>
-			<input type="email" bind:value={email} required />
+			<label for="email">Email</label>
+			<input id="email" type="email" bind:value={email} required />
 		</div>
 		<button disabled={loading}>Send Reset Link</button>
 	</form>
