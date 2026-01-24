@@ -55,7 +55,7 @@
 					>
 						<input type="hidden" name="friendshipId" value={data.friendshipId} />
 						<button type="submit" class="friend-btn pending" disabled={loading}>
-							{loading ? 'Canceling...' : 'Request Sent'}
+							{loading ? 'Canceling...' : 'Pending Friend Request'}
 						</button>
 					</form>
 				{:else if data.friendshipStatus === 'pending_received'}
@@ -72,7 +72,7 @@
 					>
 						<input type="hidden" name="friendshipId" value={data.friendshipId} />
 						<button type="submit" class="friend-btn accept" disabled={loading}>
-							{loading ? 'Accepting...' : 'Accept Request'}
+							{loading ? 'Accepting...' : 'Accept Friend Request'}
 						</button>
 					</form>
 				{:else if data.friendshipStatus === 'accepted'}
@@ -109,7 +109,10 @@
 					<div class="day-cell" title="Day {game.day}: {formatDuration(Number(game.time))}">
 						<div
 							class="bar"
-							style="height: {Math.min(100, Math.max(10, 100 - (Number(game.time) / 300000) * 100))}%"
+							style="height: {Math.min(
+								100,
+								Math.max(10, 100 - (Number(game.time) / 300000) * 100),
+							)}%"
 						></div>
 					</div>
 				{/each}
@@ -168,7 +171,9 @@
 		border-radius: 4px;
 		cursor: pointer;
 		font-weight: 600;
-		transition: transform 0.1s, opacity 0.15s;
+		transition:
+			transform 0.1s,
+			opacity 0.15s;
 		box-shadow: 0 3px 0 #019a87;
 		-webkit-tap-highlight-color: transparent;
 
