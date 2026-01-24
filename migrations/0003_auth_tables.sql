@@ -5,10 +5,10 @@ CREATE TABLE IF NOT EXISTS user (
     id TEXT PRIMARY KEY,
     name TEXT,
     email TEXT NOT NULL UNIQUE,
-    emailVerified INTEGER NOT NULL,
+    email_verified INTEGER NOT NULL,
     image TEXT,
-    createdAt INTEGER NOT NULL,
-    updatedAt INTEGER NOT NULL,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
     username TEXT UNIQUE,
     profile_visibility TEXT DEFAULT 'public'
 );
@@ -16,30 +16,30 @@ CREATE TABLE IF NOT EXISTS user (
 -- Session Table
 CREATE TABLE IF NOT EXISTS session (
     id TEXT PRIMARY KEY,
-    expiresAt INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL,
     token TEXT NOT NULL UNIQUE,
-    createdAt INTEGER NOT NULL,
-    updatedAt INTEGER NOT NULL,
-    ipAddress TEXT,
-    userAgent TEXT,
-    userId TEXT NOT NULL REFERENCES user(id) ON DELETE CASCADE
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    ip_address TEXT,
+    user_agent TEXT,
+    user_id TEXT NOT NULL REFERENCES user(id) ON DELETE CASCADE
 );
 
 -- Account Table
 CREATE TABLE IF NOT EXISTS account (
     id TEXT PRIMARY KEY,
-    accountId TEXT NOT NULL,
-    providerId TEXT NOT NULL,
-    userId TEXT NOT NULL REFERENCES user(id) ON DELETE CASCADE,
-    accessToken TEXT,
-    refreshToken TEXT,
-    idToken TEXT,
-    accessTokenExpiresAt INTEGER,
-    refreshTokenExpiresAt INTEGER,
+    account_id TEXT NOT NULL,
+    provider_id TEXT NOT NULL,
+    user_id TEXT NOT NULL REFERENCES user(id) ON DELETE CASCADE,
+    access_token TEXT,
+    refresh_token TEXT,
+    id_token TEXT,
+    access_token_expires_at INTEGER,
+    refresh_token_expires_at INTEGER,
     scope TEXT,
     password TEXT,
-    createdAt INTEGER NOT NULL,
-    updatedAt INTEGER NOT NULL
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
 );
 
 -- Verification Table
@@ -47,9 +47,9 @@ CREATE TABLE IF NOT EXISTS verification (
     id TEXT PRIMARY KEY,
     identifier TEXT NOT NULL,
     value TEXT NOT NULL,
-    expiresAt INTEGER NOT NULL,
-    createdAt INTEGER,
-    updatedAt INTEGER
+    expires_at INTEGER NOT NULL,
+    created_at INTEGER,
+    updated_at INTEGER
 );
 
 -- Friendships Table
