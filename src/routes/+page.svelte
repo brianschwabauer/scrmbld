@@ -15,7 +15,8 @@
 			{#if data.isSignedIn}
 				<a href="/account">My Account</a>
 			{:else}
-				<a href="/signin">Sign In</a>
+				<!-- <a href="/signin">Sign In</a> -->
+				<a href="/newsletter/signup">Sign Up</a>
 			{/if}
 		</div>
 	</section>
