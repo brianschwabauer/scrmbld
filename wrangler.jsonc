@@ -16,24 +16,20 @@
 	"placement": {
 		"mode": "smart",
 	},
+	"d1_databases": [
+		{
+			"binding": "D1",
+			"database_id": "864ce78f-d55c-425a-ba45-7d770e8c1f5b",
+			"database_name": "scrmbld",
+		},
+	],
 	"env": {
-		"staging": {
-			"name": "scrmbld-staging",
+		"preview": {
 			"d1_databases": [
 				{
 					"binding": "D1",
 					"database_id": "74bed334-9c30-43a3-82a5-9bd546b149ce",
 					"database_name": "scrmbld-staging",
-				},
-			],
-		},
-		"production": {
-			"name": "scrmbld",
-			"d1_databases": [
-				{
-					"binding": "D1",
-					"database_id": "864ce78f-d55c-425a-ba45-7d770e8c1f5b",
-					"database_name": "scrmbld",
 				},
 			],
 		},
