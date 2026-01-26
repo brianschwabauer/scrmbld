@@ -4,8 +4,9 @@ import { magicLink, username } from 'better-auth/plugins';
 import { Resend } from 'resend';
 import { createDb } from './db';
 import * as schema from './schema';
+import { env } from '$env/dynamic/private';
 
-export function initAuth(d1: D1Database, env: any) {
+export function initAuth(d1: D1Database) {
 	const db = createDb(d1);
 	const resend = new Resend(env.RESEND_API_KEY);
 
@@ -33,7 +34,7 @@ export function initAuth(d1: D1Database, env: any) {
 				console.log(`Sending verification email to ${user.email}: ${url}`);
 				try {
 					await resend.emails.send({
-						from: 'Scrmbld <no-reply@scrmbld.app>',
+						from: 'Scrmbld <no-reply@updates.scrmbld.app>',
 						to: user.email,
 						subject: 'Verify your email for Scrmbld',
 						html: `<p>Welcome to Scrmbld! Click <a href="${url}">here</a> to verify your email address.</p>`,
@@ -46,7 +47,7 @@ export function initAuth(d1: D1Database, env: any) {
 				console.log(`Sending password reset to ${user.email}: ${url}`);
 				try {
 					await resend.emails.send({
-						from: 'Scrmbld <no-reply@scrmbld.app>',
+						from: 'Scrmbld <no-reply@updates.scrmbld.app>',
 						to: user.email,
 						subject: 'Reset your Scrmbld password',
 						html: `<p>Click <a href="${url}">here</a> to reset your password.</p>`,
@@ -69,7 +70,7 @@ export function initAuth(d1: D1Database, env: any) {
 					console.log(`Sending magic link to ${email}: ${url}`);
 					try {
 						await resend.emails.send({
-							from: 'Scrmbld <no-reply@scrmbld.app>',
+							from: 'Scrmbld <no-reply@updates.scrmbld.app>',
 							to: email,
 							subject: 'Sign in to Scrmbld',
 							html: `<p>Click <a href="${url}">here</a> to sign in.</p>`,

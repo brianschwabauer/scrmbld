@@ -7,7 +7,7 @@ import { eq, or, and } from 'drizzle-orm';
 export const load = async ({ request, platform }) => {
 	if (!platform?.env?.D1) return { friends: [] };
 
-	const auth = initAuth(platform.env.D1, platform.env);
+	const auth = initAuth(platform.env.D1);
 	const session = await auth.api.getSession({
 		headers: request.headers,
 	});
@@ -50,7 +50,7 @@ export const load = async ({ request, platform }) => {
 export const actions = {
 	sendFriendRequest: async ({ request, platform }) => {
 		if (!platform?.env?.D1) return { success: false };
-		const auth = initAuth(platform.env.D1, platform.env);
+		const auth = initAuth(platform.env.D1);
 		const session = await auth.api.getSession({ headers: request.headers });
 		if (!session) return { success: false, error: 'Unauthorized' };
 
@@ -93,7 +93,7 @@ export const actions = {
 
 	acceptFriend: async ({ request, platform }) => {
 		if (!platform?.env?.D1) return { success: false };
-		const auth = initAuth(platform.env.D1, platform.env);
+		const auth = initAuth(platform.env.D1);
 		const session = await auth.api.getSession({ headers: request.headers });
 		if (!session) return { success: false };
 
@@ -116,7 +116,7 @@ export const actions = {
 
 	removeFriend: async ({ request, platform }) => {
 		if (!platform?.env?.D1) return { success: false };
-		const auth = initAuth(platform.env.D1, platform.env);
+		const auth = initAuth(platform.env.D1);
 		const session = await auth.api.getSession({ headers: request.headers });
 		if (!session) return { success: false };
 

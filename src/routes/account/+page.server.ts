@@ -7,7 +7,7 @@ import { eq, and, isNull, count } from 'drizzle-orm';
 export const load = async ({ request, cookies, platform, url }) => {
 	if (!platform?.env?.D1) return {};
 
-	const auth = initAuth(platform.env.D1, platform.env);
+	const auth = initAuth(platform.env.D1);
 	const session = await auth.api.getSession({
 		headers: request.headers,
 	});
@@ -73,7 +73,7 @@ export const actions = {
 	claimHistory: async ({ cookies, platform, request }) => {
 		if (!platform?.env?.D1) return { success: false, error: 'Database unavailable' };
 
-		const auth = initAuth(platform.env.D1, platform.env);
+		const auth = initAuth(platform.env.D1);
 		const session = await auth.api.getSession({ headers: request.headers });
 		if (!session) return { success: false, error: 'Unauthorized' };
 
@@ -105,7 +105,7 @@ export const actions = {
 
 	updateProfile: async ({ request, platform }) => {
 		if (!platform?.env?.D1) return { success: false };
-		const auth = initAuth(platform.env.D1, platform.env);
+		const auth = initAuth(platform.env.D1);
 		const session = await auth.api.getSession({ headers: request.headers });
 		if (!session) return { success: false, error: 'Unauthorized' };
 
@@ -146,7 +146,7 @@ export const actions = {
 
 	unlinkAccount: async ({ request, platform }) => {
 		if (!platform?.env?.D1) return { success: false };
-		const auth = initAuth(platform.env.D1, platform.env);
+		const auth = initAuth(platform.env.D1);
 		const session = await auth.api.getSession({ headers: request.headers });
 		if (!session) return { success: false, error: 'Unauthorized' };
 
@@ -175,7 +175,7 @@ export const actions = {
 
 	changePassword: async ({ request, platform }) => {
 		if (!platform?.env?.D1) return { success: false };
-		const auth = initAuth(platform.env.D1, platform.env);
+		const auth = initAuth(platform.env.D1);
 		const session = await auth.api.getSession({ headers: request.headers });
 		if (!session) return { success: false, error: 'Unauthorized' };
 
@@ -212,7 +212,7 @@ export const actions = {
 
 	changeEmail: async ({ request, platform }) => {
 		if (!platform?.env?.D1) return { success: false };
-		const auth = initAuth(platform.env.D1, platform.env);
+		const auth = initAuth(platform.env.D1);
 		const session = await auth.api.getSession({ headers: request.headers });
 		if (!session) return { success: false, error: 'Unauthorized' };
 
@@ -247,7 +247,7 @@ export const actions = {
 
 	setPassword: async ({ request, platform }) => {
 		if (!platform?.env?.D1) return { success: false };
-		const auth = initAuth(platform.env.D1, platform.env);
+		const auth = initAuth(platform.env.D1);
 		const session = await auth.api.getSession({ headers: request.headers });
 		if (!session) return { success: false, error: 'Unauthorized' };
 

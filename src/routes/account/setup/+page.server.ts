@@ -7,7 +7,7 @@ import { eq } from 'drizzle-orm';
 export const load = async ({ request, platform, url, cookies }) => {
 	if (!platform?.env?.D1) return { shouldImport: false };
 
-	const auth = initAuth(platform.env.D1, platform.env);
+	const auth = initAuth(platform.env.D1);
 	const session = await auth.api.getSession({
 		headers: request.headers,
 	});
@@ -33,7 +33,7 @@ export const actions = {
 	save: async ({ request, platform, url, cookies }) => {
 		if (!platform?.env?.D1) return { success: false, error: 'Database unavailable' };
 
-		const auth = initAuth(platform.env.D1, platform.env);
+		const auth = initAuth(platform.env.D1);
 		const session = await auth.api.getSession({ headers: request.headers });
 		if (!session) return { success: false, error: 'Unauthorized' };
 
@@ -74,7 +74,7 @@ export const actions = {
 	skip: async ({ request, platform, url, cookies }) => {
 		if (!platform?.env?.D1) throw redirect(302, '/account');
 
-		const auth = initAuth(platform.env.D1, platform.env);
+		const auth = initAuth(platform.env.D1);
 		const session = await auth.api.getSession({ headers: request.headers });
 		if (!session) throw redirect(302, '/signin');
 
