@@ -19,6 +19,9 @@
 	},
 	"observability": {
 		"enabled": true,
+		"logs": {
+			"enabled": true,
+		},
 	},
 	"placement": {
 		"mode": "smart",
