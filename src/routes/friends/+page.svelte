@@ -21,6 +21,31 @@
 <div class="container">
 	<h1>Friends</h1>
 
+	<section class="add-section">
+		<h2>Add Friend</h2>
+		<form
+			method="POST"
+			action="?/sendFriendRequest"
+			use:enhance={() => {
+				return async ({ result, update }) => {
+					await update({ reset: true });
+					if (result.type === 'success' && result.data?.success) {
+						handleSuccess();
+					}
+				};
+			}}
+			class="add-friend"
+		>
+			<input type="text" name="username" placeholder="Enter username" required />
+			<button type="submit">Send</button>
+		</form>
+		{#if showSuccess}
+			<p class="success">Friend request sent!</p>
+		{:else if form?.error}
+			<p class="error">{form.error}</p>
+		{/if}
+	</section>
+
 	{#if data.friends?.length}
 		<div class="friends-list">
 			{#each data.friends as friend}
@@ -40,8 +65,8 @@
 					</div>
 
 					<!-- svelte-ignore a11y_no_static_element_interactions -->
-				<!-- svelte-ignore a11y_click_events_have_key_events -->
-				<div class="actions" onclick={(e) => e.preventDefault()}>
+					<!-- svelte-ignore a11y_click_events_have_key_events -->
+					<div class="actions" onclick={(e) => e.preventDefault()}>
 						{#if friend.status === 'pending' && friend.initiatorId !== data.userId}
 							<form method="POST" action="?/acceptFriend" use:enhance>
 								<input type="hidden" name="friendshipId" value={friend.friendshipId} />
@@ -78,33 +103,8 @@
 			{/each}
 		</div>
 	{:else}
-		<p class="empty">No friends yet. Add someone below!</p>
+		<p class="empty">No friends yet. Add someone above!</p>
 	{/if}
-
-	<section class="add-section">
-		<h2>Add Friend</h2>
-		<form
-			method="POST"
-			action="?/sendFriendRequest"
-			use:enhance={() => {
-				return async ({ result, update }) => {
-					await update({ reset: true });
-					if (result.type === 'success' && result.data?.success) {
-						handleSuccess();
-					}
-				};
-			}}
-			class="add-friend"
-		>
-			<input type="text" name="username" placeholder="Enter username" required />
-			<button type="submit">Send</button>
-		</form>
-		{#if showSuccess}
-			<p class="success">Friend request sent!</p>
-		{:else if form?.error}
-			<p class="error">{form.error}</p>
-		{/if}
-	</section>
 </div>
 
 <BottomNav
@@ -212,8 +212,7 @@
 	}
 
 	.add-section {
-		margin-top: 1rem;
-		padding-top: 1.5rem;
+		margin-bottom: 1rem;
 		border-top: 1px solid #444444;
 	}
 
@@ -249,7 +248,9 @@
 			border-radius: 4px;
 			cursor: pointer;
 			font-weight: bold;
-			transition: transform 0.1s, opacity 0.15s;
+			transition:
+				transform 0.1s,
+				opacity 0.15s;
 			box-shadow: 0 3px 0 #999999;
 			-webkit-tap-highlight-color: transparent;
 
