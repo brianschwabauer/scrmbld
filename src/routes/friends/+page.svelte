@@ -83,8 +83,8 @@
 							>
 								<svg
 									xmlns="http://www.w3.org/2000/svg"
-									width="20"
-									height="20"
+									width="18"
+									height="18"
 									viewBox="0 0 24 24"
 									fill="none"
 									stroke="currentColor"
@@ -274,7 +274,7 @@
 		border-radius: 4px;
 		cursor: pointer;
 		font-weight: 600;
-		box-shadow: 0 2px 0 #019a87;
+		box-shadow: 0 2px 0 #008474;
 		transition: transform 0.1s;
 		-webkit-tap-highlight-color: transparent;
 
@@ -284,12 +284,13 @@
 		}
 
 		&.accept {
-			background-color: #02cfb7;
+			background-color: #00b19c;
+			color: white;
 		}
 	}
 
 	.icon-btn {
-		padding: 0.4rem;
+		padding: 0.35rem;
 		background-color: transparent;
 		border: none;
 		box-shadow: none;
@@ -309,10 +310,18 @@
 		}
 
 		&.danger {
-			color: #ff6f6f;
+			background-color: #e85454;
+			color: #ffffff;
+			box-shadow: 0 2px 0 #b94343;
+			transition: transform 0.1s;
 
 			&:hover {
-				background-color: rgba(255, 111, 111, 0.15);
+				background-color: #d64a4a;
+			}
+
+			&:active {
+				transform: translateY(2px);
+				box-shadow: none;
 			}
 		}
 	}
