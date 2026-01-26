@@ -21,23 +21,29 @@
 	const username = $derived(layoutData.session?.user?.username);
 	const userId = $derived(layoutData.session?.user?.id);
 
-	// Smart back navigation - only go back to allowed pages
+	// Smart back navigation - use ?back= query param if present, otherwise fallback
 	function handleBack() {
 		if (!browser) return;
 
-		const referrer = document.referrer;
+		// Check for ?back= query parameter first
+		const backParam = page.url.searchParams.get('back');
+		if (backParam) {
+			// Validate it's an absolute path (starts with /) and not a full URL
+			if (backParam.startsWith('/') && !backParam.startsWith('//')) {
+				goto(backParam);
+				return;
+			}
+		}
 
-		// Check if referrer is from the same origin
+		// Fallback: check document.referrer for same-origin referrers
+		const referrer = document.referrer;
 		if (referrer) {
 			try {
 				const referrerUrl = new URL(referrer);
 				const currentUrl = new URL(window.location.href);
 
-				// Only consider same-origin referrers
 				if (referrerUrl.origin === currentUrl.origin) {
 					const path = referrerUrl.pathname;
-
-					// Define allowed paths
 					const allowedPaths = ['/'];
 
 					if (isSignedIn) {
@@ -46,7 +52,6 @@
 						if (userId) allowedPaths.push(`/user/${userId}`);
 					}
 
-					// Check if referrer path matches any allowed path
 					const isAllowed = allowedPaths.some(
 						(allowed) => path === allowed || path.startsWith(allowed + '/'),
 					);

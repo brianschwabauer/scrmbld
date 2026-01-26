@@ -9,7 +9,11 @@
 
 	let { userId, username, todayGameplayId }: Props = $props();
 
-	const todayHref = $derived(todayGameplayId ? `/results/${todayGameplayId}` : '/play');
+	const todayHref = $derived(
+		todayGameplayId
+			? `/results/${todayGameplayId}`
+			: `/play?back=${encodeURIComponent(page.url.pathname)}`,
+	);
 	const profileHref = $derived(
 		username ? `/user/${username}` : userId ? `/user/${userId}` : '/account',
 	);
