@@ -49,17 +49,15 @@
 				callbackURL: '/account/setup',
 			});
 
-			if (signUpData) {
-				// New account created, redirect to setup
+			if (signUpErr) {
+				// Signup failed
+				error = signUpErr.message || 'Invalid email or password';
+			} else if (signUpData?.user?.emailVerified) {
+				// Account created and email already verified
 				goto(setupUrl);
 				return;
-			}
-
-			if (signUpErr) {
-				// If signup also failed, it's likely invalid credentials for existing user
-				error = 'Invalid email or password';
 			} else {
-				// Signup succeeded, redirect to verify email page
+				// Account created but email not verified
 				goto(`/verify-email?email=${encodeURIComponent(email)}&new=true`);
 				return;
 			}
