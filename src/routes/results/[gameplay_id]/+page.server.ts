@@ -6,6 +6,18 @@ export async function load({ platform, params, cookies, url, request }) {
 	const D1 = platform?.env?.D1;
 	if (!D1) throw error(500, { message: 'Database not available' });
 
+	// Check if user is signed in
+	let sessionUserId: string | null = null;
+	try {
+		const auth = initAuth(D1);
+		const session = await auth.api.getSession({ headers: request.headers });
+		if (session) {
+			sessionUserId = session.user.id;
+		}
+	} catch {
+		// Ignore auth errors
+	}
+
 	const now = Date.now();
 	const user_uuid = cookies.get('scrmbld_user_uuid');
 	const gameplay = await D1.prepare(`SELECT * FROM gameplay WHERE uuid = ?`)
@@ -69,15 +81,23 @@ export async function load({ platform, params, cookies, url, request }) {
 		// 52 weeeks ago, adjusted to the start of that week (Sunday)
 		new Date(gameplay.day).getUTCDate() - new Date(gameplay.day).getUTCDay() - 52 * 7,
 	);
+
+	// Query user results by user_id if the gameplay has one, otherwise by user_uuid
+	const userResultsQueryPromise = gameplay.user_id
+		? D1.prepare(`SELECT time, day FROM gameplay WHERE user_id = ? AND day <= ? AND day >= ?`)
+				.bind(gameplay.user_id, gameplay.day, fiftyTwoWeeksAgo)
+				.all<Pick<GamePlay, 'time' | 'day'>>()
+		: D1.prepare(`SELECT time, day FROM gameplay WHERE user_uuid = ? AND day <= ? AND day >= ?`)
+				.bind(gameplay.user_uuid, gameplay.day, fiftyTwoWeeksAgo)
+				.all<Pick<GamePlay, 'time' | 'day'>>();
+
 	const [todaysResultsQuery, userResultsQuery] = await Promise.all([
 		D1.prepare(
 			`SELECT * FROM gameplay WHERE day = ? AND time IS NOT NULL AND time >= 5000 AND time <= 600000 ORDER BY ended_at DESC LIMIT 200`,
 		)
 			.bind(gameplay.day)
 			.all<GamePlay>(),
-		D1.prepare(`SELECT time, day FROM gameplay WHERE user_uuid = ? AND day <= ? AND day >= ?`)
-			.bind(gameplay.user_uuid, gameplay.day, fiftyTwoWeeksAgo)
-			.all<Pick<GamePlay, 'time' | 'day'>>(),
+		userResultsQueryPromise,
 	]);
 	if (!todaysResultsQuery.success || !userResultsQuery.success) {
 		throw error(500, { message: 'Failed to fetch results' });
@@ -120,15 +140,10 @@ export async function load({ platform, params, cookies, url, request }) {
 		}
 	}
 
-	// Check if user is signed in
-	let isSignedIn = false;
-	try {
-		const auth = initAuth(D1);
-		const session = await auth.api.getSession({ headers: request.headers });
-		isSignedIn = !!session;
-	} catch {
-		// Ignore auth errors
-	}
+	// Check if this is the current user's gameplay
+	const isCurrentUser =
+		(sessionUserId && sessionUserId === gameplay.user_id) ||
+		(user_uuid && user_uuid === gameplay.user_uuid);
 
 	return {
 		day: gameplay.day,
@@ -146,7 +161,7 @@ export async function load({ platform, params, cookies, url, request }) {
 		averageForDay,
 		fastestTime,
 		numHintsUsed: gameplay.num_hints || 0,
-		isCurrentUser: user_uuid && user_uuid === gameplay.user_uuid,
-		isSignedIn,
+		isCurrentUser,
+		isSignedIn: !!sessionUserId,
 	};
 }

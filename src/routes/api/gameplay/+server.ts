@@ -2,15 +2,36 @@
 import { error } from '@sveltejs/kit';
 import { UAParser } from 'ua-parser-js';
 import { getDailyWord } from '$lib/server/daily-word.server';
+import { initAuth } from '$lib/server/auth';
 
 export async function POST({ cookies, request, getClientAddress, platform }) {
 	const d1 = platform?.env?.D1;
 	if (!d1) throw error(500, 'Database not available');
+
+	// Check if user is signed in
+	let userId: string | null = null;
+	try {
+		const auth = initAuth(d1);
+		const session = await auth.api.getSession({ headers: request.headers });
+		if (session) {
+			userId = session.user.id;
+		}
+	} catch {
+		// Ignore auth errors
+	}
+
 	const uuid = crypto.randomUUID();
 	let user_uuid = cookies.get('scrmbld_user_uuid');
-	if (!user_uuid) {
+
+	// Only set anonymous UUID cookie if user is not signed in
+	if (!userId && !user_uuid) {
 		user_uuid = crypto.randomUUID();
 		cookies.set('scrmbld_user_uuid', user_uuid, { path: '/' });
+	}
+
+	// Use a placeholder if no user_uuid (signed-in user without cookie)
+	if (!user_uuid) {
+		user_uuid = `user:${userId}`;
 	}
 	const ua = request.headers.get('User-Agent') || undefined;
 	const ip = getClientAddress() || undefined;
@@ -39,7 +60,7 @@ export async function POST({ cookies, request, getClientAddress, platform }) {
 		throw error(400, 'Gameplay word must match gameplay day and must be the current day');
 	}
 	const now = Date.now();
-	console.log(`Saving gameplay for ${day} with word ${word}: ${user_uuid}`);
+	console.log(`Saving gameplay for ${day} with word ${word}: ${userId || user_uuid}`);
 	const result = await d1
 		.prepare(
 			`INSERT INTO gameplay (
@@ -47,6 +68,7 @@ export async function POST({ cookies, request, getClientAddress, platform }) {
 			word,
 			day,
 			user_uuid,
+			user_id,
 			started_at,
 			ip,
 			ip_city,
@@ -59,13 +81,14 @@ export async function POST({ cookies, request, getClientAddress, platform }) {
 			ua_browser,
 			ua_os,
 			ua_device
-	 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 		)
 		.bind(
 			uuid,
 			word,
 			day,
 			user_uuid,
+			userId,
 			now,
 			ip,
 			platform?.cf?.city || null,

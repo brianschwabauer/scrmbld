@@ -1,6 +1,7 @@
 import WORDLIST from '../../../../static/5-letter-words.json';
+import { initAuth } from '$lib/server/auth';
 
-export function load({ cookies }) {
+export async function load({ cookies, request, platform }) {
 	const firstDay = WORDLIST.firstDay;
 	const list = WORDLIST.list;
 	const today = new Date().setUTCHours(0, 0, 0, 0);
@@ -9,7 +10,19 @@ export function load({ cookies }) {
 	const yesterdayWord = list[(daysSinceStart - 1 + list.length) % list.length];
 	const tomorrowWord = list[(daysSinceStart + 1) % list.length];
 
-	if (!cookies.get('scrmbld_user_uuid')) {
+	// Only set anonymous UUID if user is not signed in
+	let isSignedIn = false;
+	if (platform?.env?.D1) {
+		try {
+			const auth = initAuth(platform.env.D1);
+			const session = await auth.api.getSession({ headers: request.headers });
+			isSignedIn = !!session;
+		} catch {
+			// Ignore auth errors
+		}
+	}
+
+	if (!isSignedIn && !cookies.get('scrmbld_user_uuid')) {
 		cookies.set('scrmbld_user_uuid', crypto.randomUUID(), { path: '/' });
 	}
 	const mutedPreference = cookies.get('scrmbld_muted') === 'true';

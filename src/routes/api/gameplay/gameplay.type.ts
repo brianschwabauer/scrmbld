@@ -11,8 +11,11 @@ export interface GamePlay {
 	/** The word that was played. This should always be the same for every player on the say 'day' */
 	word: string;
 
-	/** The UUID of the user that played the game */
+	/** The UUID of the user that played the game (anonymous identifier) */
 	user_uuid: string;
+
+	/** The authenticated user ID (if signed in) */
+	user_id?: string;
 
 	/** The epoch timestamp in ms when the game started */
 	started_at: number;
