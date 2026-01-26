@@ -23,7 +23,9 @@
 	<header>
 		{#if data.profileUser.name}
 			<h1>{data.profileUser.name}</h1>
-			<p class="username">@{data.profileUser.username}</p>
+			{#if data.profileUser.username}
+				<p class="username">@{data.profileUser.username}</p>
+			{/if}
 		{:else}
 			<h1>@{data.profileUser.username}</h1>
 		{/if}
