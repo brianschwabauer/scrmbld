@@ -90,7 +90,7 @@ export function initAuth(d1: D1Database) {
 				},
 			},
 		},
-		trustedOrigins: [env.BETTER_AUTH_URL || 'http://localhost:5173'],
+		trustedOrigins: ['https://scrmbld.app', 'http://localhost:5173'],
 		advanced: {
 			cookiePrefix: 'scrmbld-auth',
 		},
