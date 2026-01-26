@@ -344,8 +344,7 @@
 			font-size: 2.5rem;
 		}
 		@media (min-width: 768px) {
-			justify-content: center;
-			padding: 1rem 0;
+			padding: 2rem 0;
 			:global(.my-time) {
 				font-size: 3.5rem;
 			}
