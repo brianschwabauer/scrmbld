@@ -14,10 +14,10 @@ const config = {
 		adapter: adapter({
 			platformProxy: {
 				configPath: './wrangler.jsonc',
-				environment: 'staging'
-			}
-		})
-	}
+				environment: 'preview',
+			},
+		}),
+	},
 };
 
 export default config;
