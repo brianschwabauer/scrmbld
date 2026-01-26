@@ -292,7 +292,7 @@
 		<a class="button primary" href="/play" data-sveltekit-reload>Play</a>
 	{/if}
 	{#if data.isCurrentUser}
-		<button class="primary share" onclick={() => share('text')} bind:this={shareButtonEl}>
+		<button class="primary two-line" onclick={() => share('text')} bind:this={shareButtonEl}>
 			{#if copiedTextToClipboard.has(shareText)}
 				Copied to Clipboard!
 			{:else}
@@ -300,7 +300,7 @@
 			{/if}
 			<small style="letter-spacing: 2px;">{shareText}</small>
 		</button>
-		<button class="share" onclick={() => share('url')} bind:this={shareButtonEl}>
+		<button class="two-line" onclick={() => share('url')} bind:this={shareButtonEl}>
 			{#if copiedTextToClipboard.has(shareURL)}
 				Copied to Clipboard!
 			{:else}
@@ -310,10 +310,11 @@
 		</button>
 	{/if}
 
-	{#if !data.session}
-		<div class="account-link">
-			<a href="/signin?from=results" class="button secondary">Sign In to Save Progress</a>
-		</div>
+	{#if !data.session && page.url.searchParams.has('debug')}
+		<a href="/signin?from=results" class="button two-line">
+			Sign In
+			<small>to save score</small>
+		</a>
 	{/if}
 </article>
 
@@ -338,7 +339,7 @@
 		max-width: 100vw;
 		overflow: hidden;
 		min-height: 100vh;
-		padding: 4rem 0;
+		padding: 2rem 0 4rem;
 		:global(.my-time) {
 			font-size: 2.5rem;
 		}
@@ -431,7 +432,7 @@
 				color: #000000;
 			}
 		}
-		&.share {
+		&.two-line {
 			display: flex;
 			flex-direction: column;
 			align-items: center;
