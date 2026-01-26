@@ -19,6 +19,11 @@
 			{/if}
 		</div>
 	</section>
+	<footer>
+		<a href="/privacy-policy">Privacy</a>
+		<span class="separator">·</span>
+		<a href="/terms-of-service">Terms</a>
+	</footer>
 </article>
 
 <style lang="scss">
@@ -117,6 +122,37 @@
 				background-color: #ffffff;
 				color: #000000;
 			}
+		}
+	}
+	footer {
+		position: fixed;
+		bottom: 1rem;
+		right: 1rem;
+		font-size: 0.8rem;
+		color: #999999;
+
+		a {
+			color: #999999;
+			text-decoration: none;
+			background: none;
+			box-shadow: none;
+			padding: 0;
+			font-size: inherit;
+			font-weight: normal;
+
+			&:hover {
+				color: #888888;
+				text-decoration: underline;
+				background: none;
+			}
+
+			&:active {
+				transform: none;
+			}
+		}
+
+		.separator {
+			margin: 0 0.2rem;
 		}
 	}
 </style>
