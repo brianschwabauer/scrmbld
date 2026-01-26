@@ -58,6 +58,10 @@
 			if (signUpErr) {
 				// If signup also failed, it's likely invalid credentials for existing user
 				error = 'Invalid email or password';
+			} else {
+				// Signup succeeded, redirect to verify email page
+				goto(`/verify-email?email=${encodeURIComponent(email)}&new=true`);
+				return;
 			}
 		} else {
 			error = signInErr?.message || 'An error occurred';

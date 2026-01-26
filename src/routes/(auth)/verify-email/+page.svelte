@@ -1,17 +1,39 @@
 <script lang="ts">
 	import { enhance } from '$app/forms';
-	import { signOut } from '$lib/auth-client';
+	import { signOut, sendVerificationEmail } from '$lib/auth-client';
 	import { goto } from '$app/navigation';
 
 	let { data, form } = $props();
 
 	let loading = $state(false);
 	let showSuccess = $state(false);
+	let hasResent = $state(false);
+	let clientError = $state('');
 
 	function handleSignOut() {
 		signOut().then(() => {
 			goto('/');
 		});
+	}
+
+	async function handleClientResend() {
+		if (hasResent || !data.email) return;
+
+		loading = true;
+		clientError = '';
+
+		try {
+			await sendVerificationEmail({
+				email: data.email,
+				callbackURL: '/account/setup',
+			});
+			showSuccess = true;
+			hasResent = true;
+		} catch (e: any) {
+			clientError = e?.message || 'Failed to send verification email';
+		} finally {
+			loading = false;
+		}
 	}
 </script>
 
@@ -34,48 +56,91 @@
 			</svg>
 		</div>
 
-		<h1>Verify Your Email</h1>
-
-		<p class="description">
-			We've sent a verification link to <strong>{data.email}</strong>. Please check your inbox and
-			click the link to verify your email address.
-		</p>
+		{#if data.isNewSignup}
+			<h1>Account Created!</h1>
+			<p class="description">
+				We've sent a verification link to <strong>{data.email}</strong>. Please check your inbox
+				and click the link to complete your account setup.
+			</p>
+		{:else}
+			<h1>Verify Your Email</h1>
+			<p class="description">
+				We've sent a verification link to <strong>{data.email}</strong>. Please check your inbox
+				and click the link to verify your email address.
+			</p>
+		{/if}
 
 		<p class="hint">
 			Can't find it? Check your spam folder or request a new verification email below.
 		</p>
 
-		<form
-			method="POST"
-			action="?/resendVerification"
-			use:enhance={() => {
-				loading = true;
-				showSuccess = false;
-				return async ({ result, update }) => {
-					loading = false;
-					if (result.type === 'success' && result.data?.success) {
-						showSuccess = true;
-						setTimeout(() => (showSuccess = false), 5000);
-					}
-					await update({ reset: false });
-				};
-			}}
-		>
-			<button type="submit" class="primary" disabled={loading}>
-				{loading ? 'Sending...' : 'Resend Verification Email'}
+		{#if data.hasSession}
+			<!-- Use server action when we have a session -->
+			<form
+				method="POST"
+				action="?/resendVerification"
+				use:enhance={() => {
+					loading = true;
+					showSuccess = false;
+					return async ({ result, update }) => {
+						loading = false;
+						if (result.type === 'success' && result.data?.success) {
+							showSuccess = true;
+							hasResent = true;
+						}
+						await update({ reset: false });
+					};
+				}}
+			>
+				<button type="submit" class="primary" disabled={loading || hasResent}>
+					{#if hasResent}
+						Email Sent
+					{:else if loading}
+						Sending...
+					{:else}
+						Resend Verification Email
+					{/if}
+				</button>
+			</form>
+		{:else}
+			<!-- Use client-side API when no session -->
+			<button
+				type="button"
+				class="primary"
+				disabled={loading || hasResent}
+				onclick={handleClientResend}
+			>
+				{#if hasResent}
+					Email Sent
+				{:else if loading}
+					Sending...
+				{:else}
+					Resend Verification Email
+				{/if}
 			</button>
-		</form>
+		{/if}
 
 		{#if showSuccess}
 			<p class="success">Verification email sent! Check your inbox.</p>
+		{:else if clientError}
+			<p class="error">{clientError}</p>
 		{:else if form?.error}
 			<p class="error">{form.error}</p>
 		{/if}
 
-		<div class="divider"></div>
+		{#if hasResent}
+			<p class="resent-hint">Refresh the page to send another email.</p>
+		{/if}
 
-		<p class="secondary-text">Wrong email or need to start over?</p>
-		<button type="button" class="secondary" onclick={handleSignOut}>Sign Out</button>
+		{#if data.hasSession}
+			<div class="divider"></div>
+			<p class="secondary-text">Wrong email or need to start over?</p>
+			<button type="button" class="secondary" onclick={handleSignOut}>Sign Out</button>
+		{:else}
+			<div class="divider"></div>
+			<p class="secondary-text">Need to use a different email?</p>
+			<a href="/signin" class="secondary-link">Back to Sign In</a>
+		{/if}
 	</div>
 </div>
 
@@ -186,6 +251,13 @@
 		margin: 1rem 0 0;
 	}
 
+	.resent-hint {
+		color: #666666;
+		font-size: 0.85rem;
+		margin: 0.5rem 0 0;
+		font-style: italic;
+	}
+
 	.divider {
 		height: 1px;
 		background-color: #444444;
@@ -196,5 +268,17 @@
 		color: #888888;
 		font-size: 0.9rem;
 		margin: 0 0 0.75rem;
+	}
+
+	.secondary-link {
+		display: block;
+		color: #888888;
+		font-size: 0.95rem;
+		text-decoration: none;
+		padding: 0.5rem;
+
+		&:hover {
+			color: #bbbbbb;
+		}
 	}
 </style>

@@ -26,10 +26,6 @@ export function initAuth(d1: D1Database) {
 		emailVerification: {
 			sendOnSignUp: true,
 			autoSignInAfterVerification: true,
-		},
-		emailAndPassword: {
-			enabled: true,
-			requireEmailVerification: true,
 			sendVerificationEmail: async ({ user, url }: { user: { email: string }; url: string }) => {
 				console.log(`Sending verification email to ${user.email}: ${url}`);
 				try {
@@ -43,6 +39,10 @@ export function initAuth(d1: D1Database) {
 					console.error('Failed to send verification email', e);
 				}
 			},
+		},
+		emailAndPassword: {
+			enabled: true,
+			requireEmailVerification: true,
 			sendResetPassword: async ({ user, url }: { user: { email: string }; url: string }) => {
 				console.log(`Sending password reset to ${user.email}: ${url}`);
 				try {

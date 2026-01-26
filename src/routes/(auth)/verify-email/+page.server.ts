@@ -1,25 +1,41 @@
 import { redirect } from '@sveltejs/kit';
 import { initAuth } from '$lib/server/auth';
 
-export const load = async ({ request, platform }) => {
-	if (!platform?.env?.D1) return { email: null };
+export const load = async ({ request, platform, url }) => {
+	const emailFromQuery = url.searchParams.get('email');
+	const isNewSignup = url.searchParams.get('new') === 'true';
+
+	if (!platform?.env?.D1) {
+		return { email: emailFromQuery, hasSession: false, isNewSignup };
+	}
 
 	const auth = initAuth(platform.env.D1);
 	const session = await auth.api.getSession({
 		headers: request.headers,
 	});
 
-	if (!session) {
+	if (session) {
+		// If already verified, redirect to account
+		if (session.user.emailVerified) {
+			throw redirect(302, '/account');
+		}
+
+		return {
+			email: session.user.email,
+			hasSession: true,
+			isNewSignup,
+		};
+	}
+
+	// No session - check if we have email from query params
+	if (!emailFromQuery) {
 		throw redirect(302, '/signin');
 	}
 
-	// If already verified, redirect to account
-	if (session.user.emailVerified) {
-		throw redirect(302, '/account');
-	}
-
 	return {
-		email: session.user.email,
+		email: emailFromQuery,
+		hasSession: false,
+		isNewSignup,
 	};
 };
 
