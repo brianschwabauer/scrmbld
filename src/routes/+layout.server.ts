@@ -6,7 +6,7 @@ import { eq, and } from 'drizzle-orm';
 export const load = async ({ request, platform, cookies }) => {
 	if (!platform?.env?.D1) return { session: null, todayGameplayId: null };
 
-	const auth = initAuth(platform.env.D1, platform.env);
+	const auth = initAuth(platform.env.D1);
 	const session = await auth.api.getSession({
 		headers: request.headers,
 	});

@@ -5,7 +5,7 @@ import { building } from '$app/environment';
 
 export const handle: Handle = async ({ event, resolve }) => {
 	if (event.platform?.env?.D1) {
-		const auth = initAuth(event.platform.env.D1, event.platform.env);
+		const auth = initAuth(event.platform.env.D1);
 		return svelteKitHandler({ event, resolve, auth, building });
 	}
 	return resolve(event);

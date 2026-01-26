@@ -29,7 +29,7 @@ export const load = async ({ params, platform, request }) => {
 	let isSelf = false;
 
 	// Check auth
-	const auth = initAuth(platform.env.D1, platform.env);
+	const auth = initAuth(platform.env.D1);
 	const session = await auth.api.getSession({ headers: request.headers });
 
 	if (session?.user?.id === targetUser.id) {
@@ -142,7 +142,7 @@ export const actions = {
 	addFriend: async ({ request, platform, params }) => {
 		if (!platform?.env?.D1) return { success: false, error: 'Database unavailable' };
 
-		const auth = initAuth(platform.env.D1, platform.env);
+		const auth = initAuth(platform.env.D1);
 		const session = await auth.api.getSession({ headers: request.headers });
 		if (!session) return { success: false, error: 'You must be signed in' };
 
@@ -189,7 +189,7 @@ export const actions = {
 	cancelRequest: async ({ request, platform }) => {
 		if (!platform?.env?.D1) return { success: false, error: 'Database unavailable' };
 
-		const auth = initAuth(platform.env.D1, platform.env);
+		const auth = initAuth(platform.env.D1);
 		const session = await auth.api.getSession({ headers: request.headers });
 		if (!session) return { success: false, error: 'Unauthorized' };
 
@@ -209,7 +209,7 @@ export const actions = {
 	acceptFriend: async ({ request, platform }) => {
 		if (!platform?.env?.D1) return { success: false, error: 'Database unavailable' };
 
-		const auth = initAuth(platform.env.D1, platform.env);
+		const auth = initAuth(platform.env.D1);
 		const session = await auth.api.getSession({ headers: request.headers });
 		if (!session) return { success: false, error: 'Unauthorized' };
 

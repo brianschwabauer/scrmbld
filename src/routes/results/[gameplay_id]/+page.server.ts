@@ -123,7 +123,7 @@ export async function load({ platform, params, cookies, url, request }) {
 	// Check if user is signed in
 	let isSignedIn = false;
 	try {
-		const auth = initAuth(D1, platform.env);
+		const auth = initAuth(D1);
 		const session = await auth.api.getSession({ headers: request.headers });
 		isSignedIn = !!session;
 	} catch {

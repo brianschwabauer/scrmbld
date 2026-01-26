@@ -17,6 +17,10 @@ declare global {
 		}
 		interface CloudflareEnvVariables {
 			D1: D1Database;
+			RESEND_API_KEY: string;
+			GOOGLE_CLIENT_ID: string;
+			GOOGLE_CLIENT_SECRET: string;
+			BETTER_AUTH_URL: string;
 		}
 	}
 }

@@ -5,7 +5,7 @@ import type { PageServerLoad } from './$types';
 export const load: PageServerLoad = async ({ request, platform, url, cookies }) => {
 	if (!platform?.env?.D1) return { fromResults: false };
 
-	const auth = initAuth(platform.env.D1, platform.env);
+	const auth = initAuth(platform.env.D1);
 	const session = await auth.api.getSession({
 		headers: request.headers,
 	});
