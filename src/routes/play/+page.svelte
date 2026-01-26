@@ -77,7 +77,9 @@
 	}
 	const words = $derived(data.words || []);
 	const today = $derived(new Date().setHours(0, 0, 0, 0));
-	const todaysWord = $derived((words || []).findLast(({ day }) => today >= day) || words[0]);
+	const todaysWord = $derived(
+		(words || []).findLast(({ day }) => today >= day) || words[0] || { day: 0, word: 'SCRAMBLE' },
+	);
 	const answer = $derived(todaysWord.word[0].toUpperCase());
 	const random = randomNumberGenerator();
 	let mixletters = $state(todaysWord.word.slice(1));
