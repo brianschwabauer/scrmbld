@@ -12,7 +12,11 @@
 		<div class="actions">
 			<a class="primary" href="/play">Play Now</a>
 			<a href="/help">How to Play</a>
-			{#if data.isSignedIn}
+			{#if data.session?.user?.username}
+				<a href="/user/{data.session.user.username}">My Account</a>
+			{:else if data.session?.user?.id}
+				<a href="/user/{data.session.user.id}">My Account</a>
+			{:else if data.session}
 				<a href="/account">My Account</a>
 			{:else}
 				<!-- <a href="/signin">Sign In</a> -->
