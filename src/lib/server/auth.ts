@@ -8,7 +8,7 @@ import { env } from '$env/dynamic/private';
 
 export function initAuth(d1: D1Database) {
 	const db = createDb(d1);
-	const resend = new Resend(env.RESEND_API_KEY);
+	const resend = new Resend(env.RESEND_API_KEY || 're_123');
 
 	return betterAuth({
 		database: drizzleAdapter(db, {
