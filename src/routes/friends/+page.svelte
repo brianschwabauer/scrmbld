@@ -66,7 +66,7 @@
 
 					<!-- svelte-ignore a11y_no_static_element_interactions -->
 					<!-- svelte-ignore a11y_click_events_have_key_events -->
-					<div class="actions" onclick={(e) => e.preventDefault()}>
+					<div class="actions" onclick={(e) => e.stopPropagation()}>
 						{#if friend.status === 'pending' && friend.initiatorId !== data.userId}
 							<form method="POST" action="?/acceptFriend" use:enhance>
 								<input type="hidden" name="friendshipId" value={friend.friendshipId} />
