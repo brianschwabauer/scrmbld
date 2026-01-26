@@ -6,6 +6,7 @@
 	"compatibility_date": "2026-01-26",
 	"compatibility_flags": ["nodejs_als"],
 	"preview_urls": true,
+	"workers_dev": true,
 	"routes": [
 		{
 			"custom_domain": true,
