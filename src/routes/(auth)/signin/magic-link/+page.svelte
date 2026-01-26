@@ -46,11 +46,19 @@
 			We sent a sign-in link to <strong>{email}</strong>
 		</p>
 		<p class="hint">Click the link in your email to sign in. You can close this page.</p>
-		<button type="button" class="secondary" onclick={() => { sent = false; email = ''; }}>
+		<button
+			type="button"
+			class="secondary"
+			onclick={() => {
+				sent = false;
+				email = '';
+			}}
+		>
 			Use a different email
 		</button>
 	{:else}
-		<a href={data.fromResults ? '/signin?from=results' : '/signin'} class="back-link">&larr; Back</a>
+		<a href={data.fromResults ? '/signin?from=results' : '/signin'} class="back-link">&larr; Back</a
+		>
 
 		<h1>Login link</h1>
 		<p>Enter your email and we'll send you a link to sign in. No password needed.</p>
@@ -61,13 +69,7 @@
 				handleSendLink();
 			}}
 		>
-			<input
-				type="email"
-				placeholder="Email"
-				bind:value={email}
-				required
-				disabled={loading}
-			/>
+			<input type="email" placeholder="Email" bind:value={email} required disabled={loading} />
 
 			{#if error}
 				<p class="error">{error}</p>
@@ -87,7 +89,7 @@
 		align-items: center;
 		justify-content: center;
 		padding: 2rem 1rem 4rem;
-		max-width: 500px;
+		max-width: 400px;
 		margin: 0 auto;
 		text-align: center;
 		gap: 1rem;
@@ -116,8 +118,9 @@
 		font-size: 1rem;
 		color: #bbbbbb;
 		margin: 0;
-		max-width: 350px;
+		max-width: 380px;
 		line-height: 1.4;
+		text-wrap: pretty;
 
 		&.success {
 			color: #02cfb7;
@@ -139,7 +142,7 @@
 		flex-direction: column;
 		gap: 1rem;
 		width: 100%;
-		max-width: 350px;
+		max-width: 380px;
 		margin-top: 0.5rem;
 
 		input {
