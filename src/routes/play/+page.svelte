@@ -75,7 +75,7 @@
 		// Default: go to home page
 		goto('/');
 	}
-	const words = $derived(data.words);
+	const words = $derived(data.words || []);
 	const today = $derived(new Date().setHours(0, 0, 0, 0));
 	const todaysWord = $derived((words || []).findLast(({ day }) => today >= day) || words[0]);
 	const answer = $derived(todaysWord.word[0].toUpperCase());
