@@ -310,7 +310,7 @@
 		</button>
 	{/if}
 
-	{#if !data.session && page.url.searchParams.has('debug')}
+	{#if !data.session}
 		<a href="/signin?from=results" class="button two-line">
 			Sign In
 			<small>to save score</small>
