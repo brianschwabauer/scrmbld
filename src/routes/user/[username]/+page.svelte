@@ -2,6 +2,9 @@
 	import { enhance } from '$app/forms';
 	import { page } from '$app/state';
 	import BottomNav from '$lib/BottomNav.svelte';
+	import Expand from '$lib/Expand.svelte';
+	import PersonalStats from '$lib/PersonalStats.svelte';
+	import { ACHIEVEMENT_MAP } from '$lib/achievements';
 
 	let { data, form } = $props();
 
@@ -9,6 +12,7 @@
 	const layoutData = $derived(page.data);
 
 	let loading = $state(false);
+	let selectedAchievement = $state<string | null>(null);
 
 	function formatDuration(ms: number) {
 		if (!ms) return 'N/A';
@@ -112,19 +116,56 @@
 		<section class="activity-section">
 			<h2>Activity</h2>
 			<div class="history-grid">
-				{#each data.stats.history as game}
-					<div class="day-cell" title="Day {game.day}: {formatDuration(Number(game.time))}">
+				{#each data.stats.history as game, i}
+					<div
+						class="day-cell"
+						title="{new Date(game.day).toLocaleDateString()}: {formatDuration(Number(game.time))}"
+					>
 						<div
 							class="bar"
 							style="height: {Math.min(
 								100,
 								Math.max(10, 100 - (Number(game.time) / 300000) * 100),
-							)}%"
+							)}%; animation-delay: {i * 15}ms"
 						></div>
 					</div>
 				{/each}
 			</div>
 		</section>
+	{/if}
+
+	{#if data.achievements && data.achievements.length > 0}
+		<section class="achievements-section">
+			<h2>Achievements</h2>
+			<div class="achievements-grid">
+				{#each data.achievements as ach}
+					{@const def = ACHIEVEMENT_MAP[ach.achievementId]}
+					{#if def}
+						<button
+							class="achievement-badge"
+							class:selected={selectedAchievement === ach.achievementId}
+							onclick={() =>
+								(selectedAchievement =
+									selectedAchievement === ach.achievementId ? null : ach.achievementId)}
+						>
+							<span class="icon">{def.icon}</span>
+							<span class="name">{def.name}</span>
+						</button>
+					{/if}
+				{/each}
+			</div>
+			<Expand show={selectedAchievement !== null && !!ACHIEVEMENT_MAP[selectedAchievement ?? '']}>
+				<div>
+					<p class="achievement-description">
+						{ACHIEVEMENT_MAP[selectedAchievement ?? '']?.description}
+					</p>
+				</div>
+			</Expand>
+		</section>
+	{/if}
+
+	{#if data.profileUser.isSelf && data.personalStats}
+		<PersonalStats stats={data.personalStats} />
 	{/if}
 </div>
 
@@ -277,7 +318,7 @@
 
 		.label {
 			font-size: 0.8rem;
-			color: #888888;
+			color: #aaaaaa;
 			text-transform: uppercase;
 			letter-spacing: 0.5px;
 		}
@@ -295,10 +336,10 @@
 
 	.activity-section {
 		h2 {
-			font-size: 1.1rem;
-			color: #bbbbbb;
+			font-size: 1.25rem;
+			color: #eeeeee;
 			margin: 0 0 1rem;
-			font-weight: normal;
+			font-weight: 500;
 		}
 	}
 
@@ -311,6 +352,21 @@
 		padding-bottom: 0.5rem;
 		scrollbar-width: thin;
 		scrollbar-color: #444444 transparent;
+
+		&::after {
+			content: '';
+			flex: 1;
+			align-self: stretch;
+			background: repeating-linear-gradient(
+				to right,
+				rgba(255, 255, 255, 0.05) 0,
+				rgba(255, 255, 255, 0.05) 8px,
+				transparent 8px,
+				transparent 10px
+			);
+			border-radius: 2px;
+			min-width: 10px;
+		}
 
 		&::-webkit-scrollbar {
 			height: 6px;
@@ -340,9 +396,85 @@
 		background-color: #02cfb7;
 		border-radius: 2px 2px 0 0;
 		transition: opacity 0.15s;
+		animation: bar-grow 0.3s ease-out backwards;
+		transform-origin: bottom;
 
 		&:hover {
 			opacity: 0.8;
 		}
+	}
+
+	@keyframes bar-grow {
+		from {
+			transform: scaleY(0);
+		}
+		to {
+			transform: scaleY(1);
+		}
+	}
+
+	.achievements-section {
+		margin-top: 2rem;
+
+		h2 {
+			font-size: 1.25rem;
+			color: #eeeeee;
+			margin: 0 0 1rem;
+			font-weight: 500;
+		}
+	}
+
+	.achievements-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+		gap: 0.75rem;
+	}
+
+	.achievement-badge {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 0.25rem;
+		padding: 0.75rem 0.5rem;
+		background-color: rgba(255, 255, 255, 0.03);
+		border: 1px solid #444444;
+		border-radius: 8px;
+		cursor: pointer;
+		transition:
+			border-color 0.15s,
+			background-color 0.15s;
+		font-family: inherit;
+		font-size: inherit;
+		-webkit-tap-highlight-color: transparent;
+
+		&:hover {
+			border-color: #02cfb7;
+		}
+
+		&.selected {
+			border-color: #02cfb7;
+			background-color: rgba(2, 207, 183, 0.1);
+		}
+
+		.icon {
+			font-size: 1.5rem;
+		}
+
+		.name {
+			font-size: 0.75rem;
+			color: #bbbbbb;
+			text-align: center;
+		}
+	}
+
+	.achievement-description {
+		margin: 0.75rem 0 0;
+		padding: 0.75rem 1rem;
+		font-size: 0.9rem;
+		color: #cccccc;
+		text-align: center;
+		background: linear-gradient(135deg, rgba(2, 207, 183, 0.15), rgba(2, 207, 183, 0.05));
+		border: 1px solid rgba(2, 207, 183, 0.3);
+		border-radius: 12px;
 	}
 </style>
