@@ -1,92 +1,89 @@
 <script lang="ts">
 	import { page } from '$app/state';
-	import FlipText from '$lib/FlipText.svelte';
+	import BottomNav from '$lib/BottomNav.svelte';
 
+	const layoutData = $derived(page.data);
 	const status = $derived(page.status);
 	const message = $derived(page.error?.message || 'Unknown error');
 
 	const heading = $derived.by(() => {
-		if (status === 404) return 'Page not found';
-		if (status === 403) return 'Access denied';
+		if (status === 404) return 'Game not found';
 		return 'Something went wrong';
 	});
 
 	const description = $derived.by(() => {
-		if (status === 404) return "The page you're looking for doesn't exist or has been moved.";
-		if (status === 403) return message;
+		if (status === 404) return "This game doesn't exist or the link may have expired.";
 		return message;
 	});
 </script>
 
-<article>
-	<header>
-		<FlipText word="SCRMBLD" />
+<div class="container" class:has-nav={layoutData.session}>
+	<div class="error-content">
 		<span class="status-code">{status}</span>
-		<div class="message">
-			<h1>{heading}</h1>
-			<p>{description}</p>
-		</div>
-	</header>
-	<section>
+		<h1>{heading}</h1>
+		<p>{description}</p>
 		<div class="actions">
 			<a href="/">Home</a>
-			<a href="/play" class="primary" data-sveltekit-reload>Play</a>
+			<a href="/play" class="primary" data-sveltekit-reload>Play Today's Puzzle</a>
 		</div>
-	</section>
-</article>
+	</div>
+</div>
+
+{#if layoutData.session}
+	<BottomNav
+		userId={layoutData.session?.user?.id}
+		username={layoutData.session?.user?.username}
+		todayGameplayId={layoutData.todayGameplayId}
+	/>
+{/if}
 
 <style lang="scss">
-	article {
-		display: flex;
-		justify-content: center;
-		align-items: center;
-		flex-direction: column;
-		max-width: 100vw;
-		overflow: hidden;
-		min-height: 100vh;
+	.container {
+		max-width: 600px;
+		margin: 0 auto;
+		padding: 2rem 1rem 4rem;
+
+		&.has-nav {
+			padding-bottom: calc(5rem + env(safe-area-inset-bottom));
+
+			@media (min-width: 768px) {
+				padding-bottom: 1rem;
+			}
+		}
 	}
-	header {
+
+	.error-content {
 		display: flex;
 		flex-direction: column;
 		align-items: center;
 		text-align: center;
-
-		:global(.flip-text) {
-			font-size: 1.75rem;
-		}
+		margin-top: 20vh;
 	}
+
 	.status-code {
 		font-size: 5rem;
 		font-weight: bold;
 		color: #555555;
 		line-height: 1;
-		margin-top: 1.5rem;
 	}
-	.message {
-		h1 {
-			margin: 0.75rem 0 0.5rem;
-			font-size: 1.5rem;
-		}
-		p {
-			margin: 0 auto 2rem;
-			max-width: 400px;
-			text-align: center;
-			text-wrap: pretty;
-			color: #aaaaaa;
-		}
+
+	h1 {
+		margin: 0.75rem 0 0.5rem;
+		font-size: 1.5rem;
 	}
-	section {
-		margin-bottom: 3rem;
-		opacity: 1;
-		transition: opacity 1s 1s;
-		@starting-style {
-			opacity: 0;
-		}
+
+	p {
+		margin: 0 auto 2rem;
+		max-width: 400px;
+		text-wrap: pretty;
+		color: #aaaaaa;
 	}
+
 	.actions {
 		display: flex;
 		gap: 1rem;
 	}
+
 	a {
 		cursor: pointer;
 		font-size: 1rem;
