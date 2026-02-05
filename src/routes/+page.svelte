@@ -1,12 +1,35 @@
 <script lang="ts">
+	import { browser } from '$app/environment';
+	import { page } from '$app/state';
 	import FlipText from '$lib/FlipText.svelte';
+
 	const { data } = $props();
+
+	// Get layout data (includes todayGameplayId)
+	const layoutData = $derived(page.data);
+
+	// Show streak-at-risk warning after 6 PM local time if user hasn't played today
+	const isLateInDay = $derived.by(() => {
+		if (!browser) return false;
+		const hour = new Date().getHours();
+		return hour >= 18;
+	});
+
+	const showStreakWarning = $derived(
+		layoutData.session && !layoutData.todayGameplayId && isLateInDay,
+	);
 </script>
 
 <article>
 	<header>
 		<FlipText word="SCRMBLD" />
 	</header>
+	{#if showStreakWarning}
+		<div class="streak-warning">
+			<span class="fire">🔥</span>
+			<span>Don't lose your streak! Play today's puzzle.</span>
+		</div>
+	{/if}
 	<section>
 		<p>Find the 7 letter word in 8 scrambled letters</p>
 		<div class="actions">
@@ -158,6 +181,34 @@
 
 		.separator {
 			margin: 0 0.2rem;
+		}
+	}
+
+	.streak-warning {
+		display: flex;
+		align-items: center;
+		gap: 0.5rem;
+		background-color: rgba(255, 150, 50, 0.15);
+		border: 1px solid #ff9632;
+		color: #ffaa55;
+		padding: 0.75rem 1.25rem;
+		border-radius: 8px;
+		font-size: 1rem;
+		margin-bottom: 1rem;
+		animation: pulse 2s infinite;
+
+		.fire {
+			font-size: 1.25rem;
+		}
+	}
+
+	@keyframes pulse {
+		0%,
+		100% {
+			opacity: 1;
+		}
+		50% {
+			opacity: 0.7;
 		}
 	}
 </style>
