@@ -9,6 +9,22 @@
 	const layoutData = $derived(page.data);
 
 	let showSuccess = $state(false);
+	let sentRequestIds = $state<Set<string>>(new Set());
+	let loadingMore = $state(false);
+
+	// Accumulate suggestions across "load more" clicks
+	let accumulatedSuggestions = $state(data.suggestedFriends || []);
+	let currentPage = $state(0);
+	let hasMore = $state(data.hasMoreSuggestions ?? false);
+
+	// Reset when data changes (e.g., after sending a request that removes someone)
+	$effect(() => {
+		if (data.suggestedFriends) {
+			accumulatedSuggestions = data.suggestedFriends;
+			currentPage = 0;
+			hasMore = data.hasMoreSuggestions ?? false;
+		}
+	});
 
 	function handleSuccess() {
 		showSuccess = true;
@@ -109,7 +125,7 @@
 			{#each data.friends as friend}
 				<a href="/user/{friend.friendUsername || friend.friendId}" class="friend-item">
 					<div class="info">
-						{#if friend.friendName}
+						{#if friend.status === 'accepted' && friend.friendName}
 							<strong>{friend.friendName}</strong>
 							<span class="username">@{friend.friendUsername}</span>
 						{:else}
@@ -162,6 +178,71 @@
 		</div>
 	{:else}
 		<p class="empty">No friends yet. Add someone above!</p>
+	{/if}
+
+	{#if accumulatedSuggestions?.length}
+		<section class="suggestions-section">
+			<h2>Suggested Friends</h2>
+			<div class="suggestions-list">
+				{#each accumulatedSuggestions as suggestion (suggestion.id)}
+					<div class="suggestion-item">
+						<a href="/user/{suggestion.username}" class="info">
+							<strong>@{suggestion.username}</strong>
+							{#if suggestion.mutual_friends > 0}
+								<span class="mutual"
+									>{suggestion.mutual_friends} mutual friend{suggestion.mutual_friends !== 1
+										? 's'
+										: ''}</span
+								>
+							{/if}
+						</a>
+						<div class="actions">
+							{#if sentRequestIds.has(suggestion.id)}
+								<span class="sent-badge">Request Sent</span>
+							{:else}
+								<form
+									method="POST"
+									action="?/sendRequestById"
+									use:enhance={() => {
+										return async ({ result }) => {
+											if (result.type === 'success' && result.data?.success) {
+												sentRequestIds = new Set([...sentRequestIds, suggestion.id]);
+											}
+										};
+									}}
+								>
+									<input type="hidden" name="userId" value={suggestion.id} />
+									<button type="submit" class="small add-btn">Add</button>
+								</form>
+							{/if}
+						</div>
+					</div>
+				{/each}
+			</div>
+			{#if hasMore}
+				<form
+					method="POST"
+					action="?/loadMoreSuggestions"
+					use:enhance={() => {
+						loadingMore = true;
+						return async ({ result }) => {
+							loadingMore = false;
+							if (result.type === 'success' && result.data?.suggestions) {
+								const newSuggestions = result.data.suggestions as typeof accumulatedSuggestions;
+								accumulatedSuggestions = [...accumulatedSuggestions, ...newSuggestions];
+								hasMore = result.data.hasMore as boolean;
+								currentPage = result.data.page as number;
+							}
+						};
+					}}
+				>
+					<input type="hidden" name="page" value={currentPage + 1} />
+					<button type="submit" class="load-more" disabled={loadingMore}>
+						{loadingMore ? 'Loading...' : 'Load More'}
+					</button>
+				</form>
+			{/if}
+		</section>
 	{/if}
 </div>
 
@@ -490,5 +571,94 @@
 		color: #ff6f6f;
 		font-size: 0.9rem;
 		margin: 0.5rem 0 0;
+	}
+
+	.suggestions-section {
+		margin-top: 1rem;
+		border-top: 1px solid #444444;
+		padding-top: 1rem;
+	}
+
+	.suggestions-list {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+	}
+
+	.suggestion-item {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		padding: 0.75rem 1rem;
+		background-color: rgba(255, 255, 255, 0.03);
+		border: 1px solid #444444;
+		border-radius: 8px;
+
+		.info {
+			display: flex;
+			flex-direction: column;
+			gap: 0.15rem;
+			text-decoration: none;
+			color: inherit;
+
+			strong {
+				color: #eeeeee;
+			}
+
+			.mutual {
+				font-size: 0.75rem;
+				color: #02cfb7;
+				margin-top: 0.15rem;
+			}
+		}
+
+		.actions {
+			display: flex;
+			gap: 0.5rem;
+			align-items: center;
+
+			form {
+				display: contents;
+			}
+		}
+	}
+
+	.sent-badge {
+		font-size: 0.8rem;
+		color: #888888;
+		padding: 0.4rem 0.75rem;
+		background-color: rgba(255, 255, 255, 0.05);
+		border-radius: 4px;
+	}
+
+	.add-btn {
+		background-color: #02cfb7 !important;
+		color: #111111 !important;
+		box-shadow: 0 2px 0 #008474 !important;
+	}
+
+	.load-more {
+		width: 100%;
+		margin-top: 1rem;
+		padding: 0.75rem;
+		font-size: 0.9rem;
+		background-color: transparent;
+		color: #bbbbbb;
+		border: 1px solid #555555;
+		border-radius: 6px;
+		cursor: pointer;
+		transition:
+			background-color 0.15s,
+			border-color 0.15s;
+
+		&:hover:not(:disabled) {
+			background-color: rgba(255, 255, 255, 0.05);
+			border-color: #666666;
+		}
+
+		&:disabled {
+			opacity: 0.6;
+			cursor: not-allowed;
+		}
 	}
 </style>

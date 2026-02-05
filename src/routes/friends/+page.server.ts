@@ -103,8 +103,17 @@ function getUserTimezone(
 	return 'UTC';
 }
 
-export const load = async ({ request, platform }) => {
-	if (!platform?.env?.D1) return { friends: [], leaderboard: [], weekLabel: '' };
+const SUGGESTIONS_PAGE_SIZE = 10;
+
+export const load = async ({ request, platform, url }) => {
+	if (!platform?.env?.D1)
+		return {
+			friends: [],
+			leaderboard: [],
+			weekLabel: '',
+			suggestedFriends: [],
+			hasMoreSuggestions: false,
+		};
 
 	const auth = initAuth(platform.env.D1);
 	const session = await auth.api.getSession({
@@ -117,6 +126,9 @@ export const load = async ({ request, platform }) => {
 	if (!session.user.emailVerified) {
 		throw redirect(302, '/verify-email');
 	}
+
+	// Pagination for suggestions
+	const suggestionsPage = Math.max(0, parseInt(url.searchParams.get('suggestionsPage') || '0', 10));
 
 	const db = createDb(platform.env.D1);
 	const d1 = platform.env.D1;
@@ -272,6 +284,62 @@ export const load = async ({ request, platform }) => {
 		weekLabel = `${weekStartDate.toLocaleDateString('en-US', dateFormatOptions)} - ${weekEndDate.toLocaleDateString('en-US', dateFormatOptions)}`;
 	}
 
+	// Query suggested friends: public profiles with username, excluding self and existing friendships
+	// Sorted by mutual friends count (friends-of-friends first)
+	const suggestedFriendsResult = await d1
+		.prepare(
+			`SELECT
+				u.id,
+				u.name,
+				u.username,
+				(
+					SELECT COUNT(*) FROM friendship f
+					WHERE f.status = 'accepted'
+					AND (
+						(f.user_id_1 = u.id AND f.user_id_2 IN (
+							SELECT CASE WHEN f2.user_id_1 = ? THEN f2.user_id_2 ELSE f2.user_id_1 END
+							FROM friendship f2
+							WHERE (f2.user_id_1 = ? OR f2.user_id_2 = ?) AND f2.status = 'accepted'
+						))
+						OR
+						(f.user_id_2 = u.id AND f.user_id_1 IN (
+							SELECT CASE WHEN f2.user_id_1 = ? THEN f2.user_id_2 ELSE f2.user_id_1 END
+							FROM friendship f2
+							WHERE (f2.user_id_1 = ? OR f2.user_id_2 = ?) AND f2.status = 'accepted'
+						))
+					)
+				) as mutual_friends
+			FROM user u
+			WHERE
+				u.profile_visibility = 'public'
+				AND u.username IS NOT NULL
+				AND u.id != ?
+				AND NOT EXISTS (
+					SELECT 1 FROM friendship f
+					WHERE (f.user_id_1 = ? AND f.user_id_2 = u.id)
+						OR (f.user_id_1 = u.id AND f.user_id_2 = ?)
+				)
+			ORDER BY mutual_friends DESC, u.username ASC
+			LIMIT ? OFFSET ?`,
+		)
+		.bind(
+			session.user.id,
+			session.user.id,
+			session.user.id, // For first mutual subquery
+			session.user.id,
+			session.user.id,
+			session.user.id, // For second mutual subquery
+			session.user.id, // Not me
+			session.user.id,
+			session.user.id, // Not existing friendship
+			SUGGESTIONS_PAGE_SIZE + 1, // Fetch one extra to check if there's more
+			suggestionsPage * SUGGESTIONS_PAGE_SIZE,
+		)
+		.all<{ id: string; name: string | null; username: string; mutual_friends: number }>();
+
+	const suggestedFriends = (suggestedFriendsResult.results || []).slice(0, SUGGESTIONS_PAGE_SIZE);
+	const hasMoreSuggestions = (suggestedFriendsResult.results || []).length > SUGGESTIONS_PAGE_SIZE;
+
 	return {
 		friends,
 		userId: session.user.id,
@@ -279,6 +347,9 @@ export const load = async ({ request, platform }) => {
 		userUsername: session.user.username,
 		leaderboard,
 		weekLabel,
+		suggestedFriends,
+		hasMoreSuggestions,
+		suggestionsPage,
 	};
 };
 
@@ -391,5 +462,124 @@ export const actions = {
 				),
 			);
 		return { success: true };
+	},
+
+	sendRequestById: async ({ request, platform }) => {
+		if (!platform?.env?.D1) return { success: false };
+		const auth = initAuth(platform.env.D1);
+		const session = await auth.api.getSession({ headers: request.headers });
+		if (!session) return { success: false, error: 'Unauthorized' };
+
+		const formData = await request.formData();
+		const targetUserId = formData.get('userId') as string;
+
+		if (!targetUserId) return { success: false, error: 'User ID required' };
+		if (targetUserId === session.user.id) return { success: false, error: 'Cannot add yourself' };
+
+		const db = createDb(platform.env.D1);
+
+		// Verify target user exists
+		const targetUser = await db.query.user.findFirst({
+			where: eq(user.id, targetUserId),
+		});
+
+		if (!targetUser) return { success: false, error: 'User not found' };
+
+		// Check if friendship already exists
+		const existing = await db.query.friendship.findFirst({
+			where: or(
+				and(eq(friendship.userId1, session.user.id), eq(friendship.userId2, targetUserId)),
+				and(eq(friendship.userId1, targetUserId), eq(friendship.userId2, session.user.id)),
+			),
+		});
+
+		if (existing) return { success: false, error: 'Already friends or request pending' };
+
+		await db.insert(friendship).values({
+			id: crypto.randomUUID(),
+			userId1: session.user.id,
+			userId2: targetUserId,
+			status: 'pending',
+			createdAt: new Date(),
+		});
+
+		// Send push notification to the recipient (non-blocking)
+		if (platform.env.VAPID_PUBLIC_KEY && platform.env.VAPID_PRIVATE_KEY) {
+			notifyFriendRequest(targetUserId, session.user.name || '', session.user.username, {
+				d1: platform.env.D1,
+				vapidPublicKey: platform.env.VAPID_PUBLIC_KEY,
+				vapidPrivateKey: platform.env.VAPID_PRIVATE_KEY,
+			}).catch((e) => console.error('Failed to send friend request notification:', e));
+		}
+
+		return { success: true, sentToUserId: targetUserId };
+	},
+
+	loadMoreSuggestions: async ({ request, platform }) => {
+		if (!platform?.env?.D1) return { suggestions: [], hasMore: false, page: 0 };
+		const auth = initAuth(platform.env.D1);
+		const session = await auth.api.getSession({ headers: request.headers });
+		if (!session) return { suggestions: [], hasMore: false, page: 0 };
+
+		const formData = await request.formData();
+		const page = Math.max(0, parseInt(formData.get('page') as string, 10) || 0);
+
+		const d1 = platform.env.D1;
+
+		const suggestedFriendsResult = await d1
+			.prepare(
+				`SELECT
+					u.id,
+					u.name,
+					u.username,
+					(
+						SELECT COUNT(*) FROM friendship f
+						WHERE f.status = 'accepted'
+						AND (
+							(f.user_id_1 = u.id AND f.user_id_2 IN (
+								SELECT CASE WHEN f2.user_id_1 = ? THEN f2.user_id_2 ELSE f2.user_id_1 END
+								FROM friendship f2
+								WHERE (f2.user_id_1 = ? OR f2.user_id_2 = ?) AND f2.status = 'accepted'
+							))
+							OR
+							(f.user_id_2 = u.id AND f.user_id_1 IN (
+								SELECT CASE WHEN f2.user_id_1 = ? THEN f2.user_id_2 ELSE f2.user_id_1 END
+								FROM friendship f2
+								WHERE (f2.user_id_1 = ? OR f2.user_id_2 = ?) AND f2.status = 'accepted'
+							))
+						)
+					) as mutual_friends
+				FROM user u
+				WHERE
+					u.profile_visibility = 'public'
+					AND u.username IS NOT NULL
+					AND u.id != ?
+					AND NOT EXISTS (
+						SELECT 1 FROM friendship f
+						WHERE (f.user_id_1 = ? AND f.user_id_2 = u.id)
+							OR (f.user_id_1 = u.id AND f.user_id_2 = ?)
+					)
+				ORDER BY mutual_friends DESC, u.username ASC
+				LIMIT ? OFFSET ?`,
+			)
+			.bind(
+				session.user.id,
+				session.user.id,
+				session.user.id,
+				session.user.id,
+				session.user.id,
+				session.user.id,
+				session.user.id,
+				session.user.id,
+				session.user.id,
+				SUGGESTIONS_PAGE_SIZE + 1,
+				page * SUGGESTIONS_PAGE_SIZE,
+			)
+			.all<{ id: string; name: string | null; username: string; mutual_friends: number }>();
+
+		const suggestions = (suggestedFriendsResult.results || []).slice(0, SUGGESTIONS_PAGE_SIZE);
+		const hasMore = (suggestedFriendsResult.results || []).length > SUGGESTIONS_PAGE_SIZE;
+
+		return { suggestions, hasMore, page };
 	},
 };
