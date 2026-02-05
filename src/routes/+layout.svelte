@@ -1,8 +1,27 @@
 <script lang="ts">
+	import { browser } from '$app/environment';
 	import { assets } from '$app/paths';
+	import { page } from '$app/state';
 	import { initializeAudio } from '$lib/audio';
 
 	const { children } = $props();
+
+	// Auto-save timezone for signed-in users without one
+	$effect(() => {
+		if (browser && page.data.session?.user && !page.data.session.user.timezone) {
+			const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+			if (browserTimezone) {
+				// Fire and forget - don't block on this
+				fetch('/api/account/timezone', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ timezone: browserTimezone }),
+				}).catch(() => {
+					// Ignore errors - this is a best-effort operation
+				});
+			}
+		}
+	});
 </script>
 
 <svelte:head>

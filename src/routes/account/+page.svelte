@@ -51,17 +51,47 @@
 	let originalUsername = $state(data.user?.username || '');
 	let originalName = $state(data.user?.name || '');
 	let originalProfileVisibility = $state(data.user?.profileVisibility || 'public');
+	let originalTimezone = $state(data.user?.timezone || '');
 
 	// Track form field values
 	let username = $state(data.user?.username || '');
 	let name = $state(data.user?.name || '');
 	let profileVisibility = $state(data.user?.profileVisibility || 'public');
+	let timezone = $state(data.user?.timezone || '');
+
+	// Get browser timezone for auto-detect option
+	const browserTimezone =
+		typeof window !== 'undefined' ? Intl.DateTimeFormat().resolvedOptions().timeZone : '';
+
+	// Common timezones grouped by region
+	const timezoneOptions = [
+		{ value: '', label: 'Auto-detect from browser' },
+		{ value: 'Pacific/Honolulu', label: 'Hawaii (HST)' },
+		{ value: 'America/Anchorage', label: 'Alaska (AKST)' },
+		{ value: 'America/Los_Angeles', label: 'Pacific Time (PST)' },
+		{ value: 'America/Denver', label: 'Mountain Time (MST)' },
+		{ value: 'America/Chicago', label: 'Central Time (CST)' },
+		{ value: 'America/New_York', label: 'Eastern Time (EST)' },
+		{ value: 'America/Sao_Paulo', label: 'Brasilia (BRT)' },
+		{ value: 'Atlantic/Reykjavik', label: 'Iceland (GMT)' },
+		{ value: 'Europe/London', label: 'London (GMT/BST)' },
+		{ value: 'Europe/Paris', label: 'Central Europe (CET)' },
+		{ value: 'Europe/Helsinki', label: 'Eastern Europe (EET)' },
+		{ value: 'Asia/Dubai', label: 'Dubai (GST)' },
+		{ value: 'Asia/Kolkata', label: 'India (IST)' },
+		{ value: 'Asia/Bangkok', label: 'Bangkok (ICT)' },
+		{ value: 'Asia/Singapore', label: 'Singapore (SGT)' },
+		{ value: 'Asia/Tokyo', label: 'Japan (JST)' },
+		{ value: 'Australia/Sydney', label: 'Sydney (AEST)' },
+		{ value: 'Pacific/Auckland', label: 'New Zealand (NZST)' },
+	];
 
 	// Check if any field has changed from original
 	let hasChanges = $derived(
 		username !== originalUsername ||
 			name !== originalName ||
-			profileVisibility !== originalProfileVisibility,
+			profileVisibility !== originalProfileVisibility ||
+			timezone !== originalTimezone,
 	);
 
 	// Sync originals after successful save
@@ -69,6 +99,7 @@
 		originalUsername = username;
 		originalName = name;
 		originalProfileVisibility = profileVisibility;
+		originalTimezone = timezone;
 	}
 
 	// Track which section had the last action for showing feedback
@@ -98,6 +129,144 @@
 			if (section === 'profile') showProfileSuccess = false;
 			else if (section === 'history') showHistorySuccess = false;
 		}, 5000);
+	}
+
+	// Notifications section state
+	let notificationsEnabled = $state(data.hasNotifications ?? false);
+	let notificationsLoading = $state(false);
+	let notificationsError = $state('');
+	let prefDailyReminder = $state(data.notificationPrefs?.dailyReminder ?? true);
+	let prefFriendActivity = $state(data.notificationPrefs?.friendActivity ?? true);
+	let prefWeeklyRecap = $state(data.notificationPrefs?.weeklyRecap ?? true);
+
+	function updatePreference(key: string, value: boolean) {
+		fetch('/api/push/preferences', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ [key]: value }),
+		});
+	}
+
+	async function toggleNotifications() {
+		notificationsLoading = true;
+		notificationsError = '';
+
+		try {
+			if (notificationsEnabled) {
+				// Disable notifications
+				const registration = await navigator.serviceWorker.ready;
+				const subscription = await registration.pushManager.getSubscription();
+				if (subscription) {
+					await fetch('/api/push/unsubscribe', {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({ endpoint: subscription.endpoint }),
+					});
+					await subscription.unsubscribe();
+				}
+				notificationsEnabled = false;
+			} else {
+				// Enable notifications
+				const permission = await Notification.requestPermission();
+				if (permission !== 'granted') {
+					notificationsError = 'Notification permission denied';
+					return;
+				}
+
+				const registration = await navigator.serviceWorker.ready;
+				const subscription = await registration.pushManager.subscribe({
+					userVisibleOnly: true,
+					applicationServerKey: data.vapidPublicKey,
+				});
+
+				const response = await fetch('/api/push/subscribe', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({
+						endpoint: subscription.endpoint,
+						keys: {
+							p256dh: btoa(String.fromCharCode(...new Uint8Array(subscription.getKey('p256dh')!)))
+								.replace(/\+/g, '-')
+								.replace(/\//g, '_')
+								.replace(/=+$/, ''),
+							auth: btoa(String.fromCharCode(...new Uint8Array(subscription.getKey('auth')!)))
+								.replace(/\+/g, '-')
+								.replace(/\//g, '_')
+								.replace(/=+$/, ''),
+						},
+						timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+					}),
+				});
+
+				if (!response.ok) {
+					throw new Error('Failed to save subscription');
+				}
+
+				notificationsEnabled = true;
+			}
+		} catch (e) {
+			notificationsError = e instanceof Error ? e.message : 'Failed to update notifications';
+		} finally {
+			notificationsLoading = false;
+		}
+	}
+
+	// Check if notifications are supported
+	const notificationsSupported = $derived(
+		typeof window !== 'undefined' &&
+			'Notification' in window &&
+			'serviceWorker' in navigator &&
+			'PushManager' in window,
+	);
+
+	// Data & Privacy section state
+	let exportLoading = $state(false);
+	let showDeleteConfirm = $state(false);
+	let deleteConfirmText = $state('');
+	let deleteLoading = $state(false);
+	let deleteError = $state('');
+
+	async function exportData() {
+		exportLoading = true;
+		try {
+			const response = await fetch('/api/account/export');
+			if (!response.ok) throw new Error('Export failed');
+			const blob = await response.blob();
+			const url = URL.createObjectURL(blob);
+			const a = document.createElement('a');
+			a.href = url;
+			a.download = `scrmbld-export-${new Date().toISOString().slice(0, 10)}.json`;
+			document.body.appendChild(a);
+			a.click();
+			document.body.removeChild(a);
+			URL.revokeObjectURL(url);
+		} catch {
+			// Handle error silently
+		} finally {
+			exportLoading = false;
+		}
+	}
+
+	async function deleteAccount() {
+		if (deleteConfirmText !== 'DELETE') return;
+		deleteLoading = true;
+		deleteError = '';
+		try {
+			const response = await fetch('/api/account/delete', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ confirm: true }),
+			});
+			if (!response.ok) {
+				const text = await response.text();
+				throw new Error(text || 'Deletion failed');
+			}
+			goto('/');
+		} catch (e) {
+			deleteError = e instanceof Error ? e.message : 'Failed to delete account';
+		} finally {
+			deleteLoading = false;
+		}
 	}
 </script>
 
@@ -165,12 +334,120 @@
 					<option value="private" selected={profileVisibility === 'private'}>Private</option>
 				</select>
 			</div>
+			<div class="field">
+				<label for="timezone">Timezone</label>
+				<select id="timezone" name="timezone" bind:value={timezone}>
+					{#each timezoneOptions as tz}
+						<option value={tz.value} selected={timezone === tz.value}>
+							{tz.label}{tz.value === '' && browserTimezone ? ` (${browserTimezone})` : ''}
+						</option>
+					{/each}
+				</select>
+				<small class="hint">Used for weekly leaderboard and daily reminders</small>
+			</div>
 			<button type="submit" disabled={!hasChanges}>Save Changes</button>
 		</form>
 		{#if showProfileSuccess}
 			<p class="success">Saved!</p>
 		{:else if form?.error && lastAction === 'profile'}
 			<p class="error">{form.error}</p>
+		{/if}
+	</section>
+
+	<section>
+		<h2>Notifications</h2>
+		{#if notificationsSupported}
+			<div class="notification-toggle">
+				<div class="toggle-info">
+					<span class="toggle-label">Push Notifications</span>
+					<span class="toggle-description">Enable push notifications from SCRMBLD</span>
+				</div>
+				<button
+					type="button"
+					class="toggle-btn"
+					class:active={notificationsEnabled}
+					disabled={notificationsLoading}
+					onclick={toggleNotifications}
+					aria-label={notificationsEnabled ? 'Disable notifications' : 'Enable notifications'}
+				>
+					<span class="toggle-track">
+						<span class="toggle-thumb"></span>
+					</span>
+				</button>
+			</div>
+			{#if notificationsEnabled}
+				<div class="notification-prefs">
+					<div class="notification-toggle sub">
+						<div class="toggle-info">
+							<span class="toggle-label">Daily Reminders</span>
+							<span class="toggle-description">Reminder if you haven't played today's puzzle</span>
+						</div>
+						<button
+							type="button"
+							class="toggle-btn"
+							class:active={prefDailyReminder}
+							onclick={() => {
+								prefDailyReminder = !prefDailyReminder;
+								updatePreference('dailyReminder', prefDailyReminder);
+							}}
+							aria-label={prefDailyReminder ? 'Disable daily reminders' : 'Enable daily reminders'}
+						>
+							<span class="toggle-track">
+								<span class="toggle-thumb"></span>
+							</span>
+						</button>
+					</div>
+					<div class="notification-toggle sub">
+						<div class="toggle-info">
+							<span class="toggle-label">Friend Activity</span>
+							<span class="toggle-description">Friend requests and acceptances</span>
+						</div>
+						<button
+							type="button"
+							class="toggle-btn"
+							class:active={prefFriendActivity}
+							onclick={() => {
+								prefFriendActivity = !prefFriendActivity;
+								updatePreference('friendActivity', prefFriendActivity);
+							}}
+							aria-label={prefFriendActivity
+								? 'Disable friend notifications'
+								: 'Enable friend notifications'}
+						>
+							<span class="toggle-track">
+								<span class="toggle-thumb"></span>
+							</span>
+						</button>
+					</div>
+					<div class="notification-toggle sub">
+						<div class="toggle-info">
+							<span class="toggle-label">Weekly Recap</span>
+							<span class="toggle-description"
+								>Monday notification when you top the leaderboard</span
+							>
+						</div>
+						<button
+							type="button"
+							class="toggle-btn"
+							class:active={prefWeeklyRecap}
+							onclick={() => {
+								prefWeeklyRecap = !prefWeeklyRecap;
+								updatePreference('weeklyRecap', prefWeeklyRecap);
+							}}
+							aria-label={prefWeeklyRecap ? 'Disable weekly recap' : 'Enable weekly recap'}
+						>
+							<span class="toggle-track">
+								<span class="toggle-thumb"></span>
+							</span>
+						</button>
+					</div>
+				</div>
+			{/if}
+			{#if notificationsError}
+				<p class="error">{notificationsError}</p>
+			{/if}
+		{:else}
+			<p class="hint">Push notifications are not supported in your browser.</p>
 		{/if}
 	</section>
 
@@ -560,6 +837,66 @@
 			{/if}
 		</section>
 	{/if}
+
+	<section class="danger-section">
+		<h2>Data & Privacy</h2>
+
+		<div class="data-subsection">
+			<h3>Export Your Data</h3>
+			<p>Download a copy of all your data including profile, game history, and achievements.</p>
+			<button type="button" class="secondary" onclick={exportData} disabled={exportLoading}>
+				{exportLoading ? 'Preparing...' : 'Export My Data'}
+			</button>
+		</div>
+
+		<div class="data-subsection">
+			<h3>Delete Account</h3>
+			<p>
+				Permanently delete your account and all associated data. Your game history will be
+				anonymized for aggregate statistics.
+			</p>
+			{#if showDeleteConfirm}
+				<div class="delete-confirm">
+					<p class="warning">
+						This action cannot be undone. Type <strong>DELETE</strong> to confirm.
+					</p>
+					<input
+						type="text"
+						bind:value={deleteConfirmText}
+						placeholder="Type DELETE"
+						class="delete-input"
+					/>
+					<div class="form-actions">
+						<button
+							type="button"
+							class="danger"
+							onclick={deleteAccount}
+							disabled={deleteConfirmText !== 'DELETE' || deleteLoading}
+						>
+							{deleteLoading ? 'Deleting...' : 'Delete My Account'}
+						</button>
+						<button
+							type="button"
+							class="secondary"
+							onclick={() => {
+								showDeleteConfirm = false;
+								deleteConfirmText = '';
+							}}
+						>
+							Cancel
+						</button>
+					</div>
+				</div>
+			{:else}
+				<button type="button" class="danger" onclick={() => (showDeleteConfirm = true)}>
+					Delete Account
+				</button>
+			{/if}
+			{#if deleteError}
+				<p class="error">{deleteError}</p>
+			{/if}
+		</div>
+	</section>
 </div>
 
 <BottomNav
@@ -930,5 +1267,131 @@
 		color: #02cfb7;
 		font-size: 0.9rem;
 		margin: 0.75rem 0 0;
+	}
+
+	.data-subsection {
+		margin-bottom: 1.5rem;
+		padding-bottom: 1.5rem;
+		border-bottom: 1px solid #444444;
+
+		&:last-child {
+			margin-bottom: 0;
+			padding-bottom: 0;
+			border-bottom: none;
+		}
+
+		h3 {
+			margin: 0 0 0.5rem;
+		}
+
+		p {
+			margin: 0 0 0.75rem;
+		}
+	}
+
+	.delete-confirm {
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+
+		.warning {
+			color: #ff9999;
+			font-size: 0.9rem;
+			margin: 0;
+		}
+
+		.delete-input {
+			font-family: inherit;
+		}
+	}
+
+	.notification-toggle {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		padding: 0.75rem;
+		background-color: rgba(255, 255, 255, 0.03);
+		border-radius: 6px;
+		border: 1px solid #555555;
+
+		&.sub {
+			border: none;
+			background-color: transparent;
+			padding: 0.5rem 0;
+		}
+	}
+
+	.notification-prefs {
+		margin-top: 0.5rem;
+		padding: 0 0.75rem;
+		border-left: 2px solid #555555;
+		margin-left: 0.75rem;
+	}
+
+	.toggle-info {
+		display: flex;
+		flex-direction: column;
+		gap: 0.25rem;
+	}
+
+	.toggle-label {
+		font-size: 1rem;
+		color: #eeeeee;
+	}
+
+	.toggle-description {
+		font-size: 0.8rem;
+		color: #888888;
+	}
+
+	.toggle-btn {
+		padding: 0;
+		background: transparent;
+		border: none;
+		box-shadow: none;
+		cursor: pointer;
+
+		&:disabled {
+			opacity: 0.5;
+			cursor: not-allowed;
+		}
+
+		&:hover:not(:disabled) {
+			opacity: 1;
+		}
+
+		&:active:not(:disabled) {
+			transform: none;
+		}
+	}
+
+	.toggle-track {
+		display: block;
+		width: 50px;
+		height: 28px;
+		background-color: #555555;
+		border-radius: 14px;
+		position: relative;
+		transition: background-color 0.2s;
+
+		.active & {
+			background-color: #02cfb7;
+		}
+	}
+
+	.toggle-thumb {
+		display: block;
+		width: 22px;
+		height: 22px;
+		background-color: #ffffff;
+		border-radius: 50%;
+		position: absolute;
+		top: 3px;
+		left: 3px;
+		transition: transform 0.2s;
+
+		.active & {
+			transform: translateX(22px);
+		}
 	}
 </style>

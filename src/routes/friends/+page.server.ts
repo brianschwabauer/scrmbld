@@ -3,9 +3,108 @@ import { initAuth } from '$lib/server/auth';
 import { createDb } from '$lib/server/db';
 import { friendship, user } from '$lib/server/schema';
 import { eq, or, and } from 'drizzle-orm';
+import { notifyFriendRequest, notifyFriendAccepted } from '$lib/server/notifications';
+
+interface LeaderboardEntry {
+	userId: string;
+	name: string | null;
+	username: string | null;
+	avgTime: number | null;
+	gamesPlayed: number;
+	streak: number;
+}
+
+/**
+ * Get week boundaries (Monday 00:00 to Sunday 23:59:59) in the user's timezone.
+ * Returns UTC timestamps that correspond to those local times.
+ */
+function getWeekBoundariesForTimezone(timezone: string): { weekStart: number; weekEnd: number } {
+	const now = new Date();
+
+	try {
+		// Get current date components in the specified timezone
+		const options = { timeZone: timezone };
+		const localYear = parseInt(
+			new Intl.DateTimeFormat('en-US', { ...options, year: 'numeric' }).format(now),
+		);
+		const localMonth =
+			parseInt(new Intl.DateTimeFormat('en-US', { ...options, month: 'numeric' }).format(now)) - 1;
+		const localDay = parseInt(
+			new Intl.DateTimeFormat('en-US', { ...options, day: 'numeric' }).format(now),
+		);
+		const localWeekday = new Intl.DateTimeFormat('en-US', { ...options, weekday: 'short' }).format(
+			now,
+		);
+
+		// Calculate days since Monday (Monday=0, Sunday=6)
+		const weekdayToNum: Record<string, number> = {
+			Sun: 6,
+			Mon: 0,
+			Tue: 1,
+			Wed: 2,
+			Thu: 3,
+			Fri: 4,
+			Sat: 5,
+		};
+		const daysSinceMonday = weekdayToNum[localWeekday] ?? 0;
+
+		// Calculate the Monday date (may be in previous month - Date.UTC handles this)
+		const mondayDay = localDay - daysSinceMonday;
+
+		// Get the timezone offset at Monday noon (to avoid DST boundary issues)
+		const testUTC = Date.UTC(localYear, localMonth, mondayDay, 12, 0, 0);
+		const testDate = new Date(testUTC);
+		const localHour = parseInt(
+			new Intl.DateTimeFormat('en-US', { ...options, hour: 'numeric', hour12: false }).format(
+				testDate,
+			),
+		);
+		const offsetHours = localHour - 12;
+
+		// Monday 00:00 local in UTC
+		const weekStart = Date.UTC(localYear, localMonth, mondayDay, 0, 0, 0) - offsetHours * 3600000;
+		const weekEnd = weekStart + 7 * 86400000;
+
+		return { weekStart, weekEnd };
+	} catch {
+		// Invalid timezone, fall back to UTC
+		return getWeekBoundariesUTC();
+	}
+}
+
+/**
+ * Get week boundaries in UTC (fallback)
+ */
+function getWeekBoundariesUTC(): { weekStart: number; weekEnd: number } {
+	const now = new Date();
+	const dayOfWeek = now.getUTCDay(); // 0=Sun, 6=Sat
+	const daysSinceMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+	const weekStart = Date.UTC(
+		now.getUTCFullYear(),
+		now.getUTCMonth(),
+		now.getUTCDate() - daysSinceMonday,
+	);
+	const weekEnd = weekStart + 7 * 86400000;
+	return { weekStart, weekEnd };
+}
+
+/**
+ * Get the user's timezone using the fallback chain:
+ * 1. User's profile timezone preference
+ * 2. IP-detected timezone from Cloudflare
+ * 3. UTC as final fallback
+ */
+function getUserTimezone(
+	userTimezone: string | null | undefined,
+	cfTimezone: string | undefined,
+): string {
+	if (userTimezone) return userTimezone;
+	if (cfTimezone) return cfTimezone;
+	return 'UTC';
+}
 
 export const load = async ({ request, platform }) => {
-	if (!platform?.env?.D1) return { friends: [] };
+	if (!platform?.env?.D1) return { friends: [], leaderboard: [], weekLabel: '' };
 
 	const auth = initAuth(platform.env.D1);
 	const session = await auth.api.getSession({
@@ -20,6 +119,7 @@ export const load = async ({ request, platform }) => {
 	}
 
 	const db = createDb(platform.env.D1);
+	const d1 = platform.env.D1;
 
 	// Fetch friends
 	const friends = await db
@@ -41,9 +141,144 @@ export const load = async ({ request, platform }) => {
 		)
 		.where(or(eq(friendship.userId1, session.user.id), eq(friendship.userId2, session.user.id)));
 
+	// Get user's timezone using fallback chain
+	const cfTimezone = platform?.cf?.timezone as string | undefined;
+	const userTimezone = getUserTimezone(session.user.timezone, cfTimezone);
+
+	// Calculate week boundaries in user's timezone (Monday start)
+	const { weekStart, weekEnd } = getWeekBoundariesForTimezone(userTimezone);
+
+	// Used later for streak calculation
+	const now = new Date();
+
+	// Get accepted friend IDs
+	const acceptedFriendIds = friends.filter((f) => f.status === 'accepted').map((f) => f.friendId);
+
+	// Include self in leaderboard
+	const leaderboardUserIds = [session.user.id, ...acceptedFriendIds];
+
+	let leaderboard: LeaderboardEntry[] = [];
+	let weekLabel = '';
+
+	if (leaderboardUserIds.length > 0) {
+		// Query gameplay for this week for all leaderboard users
+		const placeholders = leaderboardUserIds.map(() => '?').join(',');
+		const weeklyGamesResult = await d1
+			.prepare(
+				`SELECT user_id, time, day FROM gameplay
+				 WHERE user_id IN (${placeholders})
+				 AND day >= ? AND day < ?
+				 AND time IS NOT NULL`,
+			)
+			.bind(...leaderboardUserIds, weekStart, weekEnd)
+			.all<{ user_id: string; time: number; day: number }>();
+
+		// Query for streak data (last 100 days)
+		const hundredDaysAgo = Date.now() - 100 * 86400000;
+		const streakGamesResult = await d1
+			.prepare(
+				`SELECT user_id, day FROM gameplay
+				 WHERE user_id IN (${placeholders})
+				 AND day >= ?
+				 AND time IS NOT NULL
+				 ORDER BY day DESC`,
+			)
+			.bind(...leaderboardUserIds, hundredDaysAgo)
+			.all<{ user_id: string; day: number }>();
+
+		// Query user info for all leaderboard users
+		const usersResult = await d1
+			.prepare(`SELECT id, name, username FROM user WHERE id IN (${placeholders})`)
+			.bind(...leaderboardUserIds)
+			.all<{ id: string; name: string | null; username: string | null }>();
+
+		const userMap = new Map(usersResult.results.map((u) => [u.id, u]));
+
+		// Group weekly games by user
+		// Note: gameplay.time is NUMERIC affinity in SQLite, D1 may return as string
+		const weeklyByUser = new Map<string, number[]>();
+		for (const game of weeklyGamesResult.results || []) {
+			if (!weeklyByUser.has(game.user_id)) {
+				weeklyByUser.set(game.user_id, []);
+			}
+			weeklyByUser.get(game.user_id)!.push(Number(game.time));
+		}
+
+		// Group streak games by user
+		const streakByUser = new Map<string, number[]>();
+		for (const game of streakGamesResult.results || []) {
+			if (!streakByUser.has(game.user_id)) {
+				streakByUser.set(game.user_id, []);
+			}
+			streakByUser.get(game.user_id)!.push(game.day);
+		}
+
+		// Calculate streak for each user
+		const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+		const msPerDay = 86400000;
+
+		function calculateStreak(days: number[]): number {
+			if (!days.length) return 0;
+			const sortedDays = [...new Set(days)].sort((a, b) => b - a);
+			let streak = 0;
+			// If the most recent game isn't today, start counting from yesterday
+			const startDay = sortedDays[0] === today ? today : today - msPerDay;
+			for (let i = 0; i < sortedDays.length; i++) {
+				const expectedDay = startDay - msPerDay * i;
+				if (sortedDays[i] === expectedDay) {
+					streak++;
+				} else {
+					break;
+				}
+			}
+			return streak;
+		}
+
+		// Build leaderboard entries
+		leaderboard = leaderboardUserIds.map((userId) => {
+			const userInfo = userMap.get(userId);
+			const weeklyTimes = weeklyByUser.get(userId) || [];
+			const streakDays = streakByUser.get(userId) || [];
+
+			const avgTime =
+				weeklyTimes.length > 0 ? weeklyTimes.reduce((a, b) => a + b, 0) / weeklyTimes.length : null;
+
+			return {
+				userId,
+				name: userInfo?.name || null,
+				username: userInfo?.username || null,
+				avgTime,
+				gamesPlayed: weeklyTimes.length,
+				streak: calculateStreak(streakDays),
+			};
+		});
+
+		// Sort by avg time ascending (null/no games at the end)
+		leaderboard.sort((a, b) => {
+			if (a.avgTime === null && b.avgTime === null) return 0;
+			if (a.avgTime === null) return 1;
+			if (b.avgTime === null) return -1;
+			return a.avgTime - b.avgTime;
+		});
+
+		// Format week label using the user's timezone
+		const weekStartDate = new Date(weekStart);
+		const weekEndDate = new Date(weekEnd - msPerDay);
+		const dateFormatOptions: Intl.DateTimeFormatOptions = {
+			month: 'short',
+			day: 'numeric',
+			timeZone: userTimezone,
+		};
+		weekLabel = `${weekStartDate.toLocaleDateString('en-US', dateFormatOptions)} - ${weekEndDate.toLocaleDateString('en-US', dateFormatOptions)}`;
+	}
+
 	return {
 		friends,
 		userId: session.user.id,
+		userName: session.user.name,
+		userUsername: session.user.username,
+		leaderboard,
+		weekLabel,
 	};
 };
 
@@ -88,6 +323,15 @@ export const actions = {
 			createdAt: new Date(),
 		});
 
+		// Send push notification to the recipient (non-blocking)
+		if (platform.env.VAPID_PUBLIC_KEY && platform.env.VAPID_PRIVATE_KEY) {
+			notifyFriendRequest(targetUser.id, session.user.name || '', session.user.username, {
+				d1: platform.env.D1,
+				vapidPublicKey: platform.env.VAPID_PUBLIC_KEY,
+				vapidPrivateKey: platform.env.VAPID_PRIVATE_KEY,
+			}).catch((e) => console.error('Failed to send friend request notification:', e));
+		}
+
 		return { success: true, message: 'Friend request sent!' };
 	},
 
@@ -101,15 +345,29 @@ export const actions = {
 		const friendshipId = formData.get('friendshipId') as string;
 
 		const db = createDb(platform.env.D1);
-		await db
-			.update(friendship)
-			.set({ status: 'accepted' })
-			.where(
-				and(
-					eq(friendship.id, friendshipId),
-					eq(friendship.userId2, session.user.id), // Only recipient can accept
-				),
-			);
+
+		// Get the friendship to find the original sender
+		const existingFriendship = await db.query.friendship.findFirst({
+			where: and(eq(friendship.id, friendshipId), eq(friendship.userId2, session.user.id)),
+		});
+
+		if (!existingFriendship) return { success: false };
+
+		await db.update(friendship).set({ status: 'accepted' }).where(eq(friendship.id, friendshipId));
+
+		// Send push notification to the original sender (non-blocking)
+		if (platform.env.VAPID_PUBLIC_KEY && platform.env.VAPID_PRIVATE_KEY) {
+			notifyFriendAccepted(
+				existingFriendship.userId1,
+				session.user.name || '',
+				session.user.username,
+				{
+					d1: platform.env.D1,
+					vapidPublicKey: platform.env.VAPID_PUBLIC_KEY,
+					vapidPrivateKey: platform.env.VAPID_PRIVATE_KEY,
+				},
+			).catch((e) => console.error('Failed to send friend accepted notification:', e));
+		}
 
 		return { success: true };
 	},

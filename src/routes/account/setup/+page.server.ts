@@ -40,8 +40,17 @@ export const actions = {
 		const formData = await request.formData();
 		const name = (formData.get('name') as string)?.trim() || '';
 		const username = (formData.get('username') as string)?.trim().toLowerCase() || '';
+		const timezone = (formData.get('timezone') as string)?.trim() || '';
 
 		const db = createDb(platform.env.D1);
+
+		// Build update object
+		const updateData: { name: string; username?: string; timezone?: string } = { name };
+
+		// Only set timezone if provided and user doesn't already have one
+		if (timezone && !session.user.timezone) {
+			updateData.timezone = timezone;
+		}
 
 		// Validate username if provided
 		if (username) {
@@ -58,10 +67,10 @@ export const actions = {
 				return { success: false, error: 'Username is already taken' };
 			}
 
-			await db.update(user).set({ name, username }).where(eq(user.id, session.user.id));
-		} else {
-			await db.update(user).set({ name }).where(eq(user.id, session.user.id));
+			updateData.username = username;
 		}
+
+		await db.update(user).set(updateData).where(eq(user.id, session.user.id));
 
 		// Check if we should auto-import and redirect accordingly
 		const shouldImport =
@@ -77,6 +86,14 @@ export const actions = {
 		const auth = initAuth(platform.env.D1);
 		const session = await auth.api.getSession({ headers: request.headers });
 		if (!session) throw redirect(302, '/signin');
+
+		// Save timezone even when skipping, if user doesn't have one
+		const formData = await request.formData();
+		const timezone = (formData.get('timezone') as string)?.trim() || '';
+		if (timezone && !session.user.timezone) {
+			const db = createDb(platform.env.D1);
+			await db.update(user).set({ timezone }).where(eq(user.id, session.user.id));
+		}
 
 		// Check if we should auto-import and redirect accordingly
 		const shouldImport =

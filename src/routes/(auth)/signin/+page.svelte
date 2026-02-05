@@ -42,6 +42,7 @@
 			signInErr?.message?.toLowerCase().includes('credentials')
 		) {
 			// Try to create account
+			// Note: Timezone will be auto-saved via root layout effect after signup completes
 			const { data: signUpData, error: signUpErr } = await signUp.email({
 				email,
 				password,

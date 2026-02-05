@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { browser } from '$app/environment';
 	import { enhance } from '$app/forms';
 
 	let { data, form } = $props();
@@ -6,6 +7,9 @@
 	let name = $state(data.user?.name || '');
 	let username = $state(data.user?.username || '');
 	let saving = $state(false);
+
+	// Get browser timezone for new users
+	const browserTimezone = browser ? Intl.DateTimeFormat().resolvedOptions().timeZone : '';
 </script>
 
 <div class="container">
@@ -39,6 +43,9 @@
 			disabled={saving}
 		/>
 
+		<!-- Hidden timezone field for automatic detection -->
+		<input type="hidden" name="timezone" value={browserTimezone} />
+
 		{#if form?.error}
 			<p class="error">{form.error}</p>
 		{/if}
@@ -49,6 +56,7 @@
 	</form>
 
 	<form method="POST" action="?/skip" use:enhance>
+		<input type="hidden" name="timezone" value={browserTimezone} />
 		<button type="submit" class="skip" disabled={saving}>Skip for now</button>
 	</form>
 </div>

@@ -39,6 +39,7 @@ export const load = async ({ request, platform, cookies }) => {
 				id: session.user.id,
 				username: session.user.username,
 				name: session.user.name,
+				timezone: session.user.timezone,
 			},
 		},
 		todayGameplayId: todayGame?.endedAt ? todayGame.uuid : null,

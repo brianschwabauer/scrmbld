@@ -88,6 +88,10 @@ export function initAuth(d1: D1Database) {
 					required: false,
 					defaultValue: 'public',
 				},
+				timezone: {
+					type: 'string',
+					required: false,
+				},
 			},
 		},
 		trustedOrigins: ['https://scrmbld.app', 'http://localhost:5173'],

@@ -1,7 +1,7 @@
 import { redirect } from '@sveltejs/kit';
 import { initAuth } from '$lib/server/auth';
 import { createDb } from '$lib/server/db';
-import { account, gameplay, user } from '$lib/server/schema';
+import { account, gameplay, user, pushSubscription } from '$lib/server/schema';
 import { eq, and, isNull, count } from 'drizzle-orm';
 
 export const load = async ({ request, cookies, platform, url }) => {
@@ -61,11 +61,28 @@ export const load = async ({ request, cookies, platform, url }) => {
 	// Re-check if there's still history to import (in case auto-import didn't happen)
 	const hasAnonHistory = !shouldAutoImport && !!anonUuid;
 
+	// Check if user has push notifications enabled and get preferences
+	const pushSub = await db.query.pushSubscription.findFirst({
+		where: eq(pushSubscription.userId, session.user.id),
+	});
+
+	const hasNotifications = !!pushSub;
+	const notificationPrefs = pushSub
+		? {
+				dailyReminder: !!pushSub.notifyDailyReminder,
+				friendActivity: !!pushSub.notifyFriendActivity,
+				weeklyRecap: !!pushSub.notifyWeeklyRecap,
+			}
+		: { dailyReminder: true, friendActivity: true, weeklyRecap: true };
+
 	return {
 		user: session.user,
 		hasAnonHistory,
 		linkedAccounts,
 		autoImportCount,
+		hasNotifications,
+		notificationPrefs,
+		vapidPublicKey: platform.env.VAPID_PUBLIC_KEY,
 	};
 };
 
@@ -113,6 +130,7 @@ export const actions = {
 		const profile = formData.get('profile') as string;
 		const name = (formData.get('name') as string)?.trim() || '';
 		const newUsername = (formData.get('username') as string)?.trim().toLowerCase() || '';
+		const timezone = (formData.get('timezone') as string)?.trim() || null;
 
 		const db = createDb(platform.env.D1);
 
@@ -138,6 +156,7 @@ export const actions = {
 				name,
 				username: newUsername || null,
 				profileVisibility: profile,
+				timezone,
 			})
 			.where(eq(user.id, session.user.id));
 
