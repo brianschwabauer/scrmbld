@@ -32,7 +32,7 @@ export async function load({ cookies, request, platform }) {
 		words: [
 			{ day: today - 86400000, word: yesterdayWord },
 			{ day: today, word: todayWord },
-			{ day: today + 86400000, word: tomorrowWord }
-		]
+			{ day: today + 86400000, word: tomorrowWord },
+		],
 	};
 }

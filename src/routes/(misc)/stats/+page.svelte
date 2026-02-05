@@ -18,7 +18,7 @@
 				<h3>
 					{new Date(stat.day).toLocaleDateString(undefined, {
 						timeZone: 'UTC',
-						dateStyle: 'medium'
+						dateStyle: 'medium',
 					})}
 				</h3>
 				<div class="stats">
@@ -26,7 +26,7 @@
 					<p>{Intl.NumberFormat().format(stat.numCorrect || 0)} correct</p>
 					<p>
 						{Math.floor(
-							(stat.average || 0) / 60000
+							(stat.average || 0) / 60000,
 						)}:{`${Math.floor(((stat.average || 0) / 1000) % 60)}`.padStart(2, '0')} average
 					</p>
 				</div>

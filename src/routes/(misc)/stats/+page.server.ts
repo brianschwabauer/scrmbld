@@ -1,4 +1,4 @@
-import type { GamePlay } from '../api/gameplay/gameplay.type';
+import type { GamePlay } from '../../api/gameplay/gameplay.type';
 
 export async function load({ platform }) {
 	const d1 = platform?.env?.D1;
@@ -10,12 +10,12 @@ export async function load({ platform }) {
 					word: 'placeholder',
 					average: 60000,
 					numAttempts: 100,
-					numCorrect: 50
-				}
-			]
+					numCorrect: 50,
+				},
+			],
 		};
 	console.log(
-		`Querying for gameplay records from ${new Date().setUTCHours(0, 0, 0, 0) - 86400000 * 7}`
+		`Querying for gameplay records from ${new Date().setUTCHours(0, 0, 0, 0) - 86400000 * 7}`,
 	);
 	const result = await d1
 		.prepare(`SELECT day, word, time FROM gameplay WHERE day > ?`)
@@ -32,7 +32,7 @@ export async function load({ platform }) {
 		if (!game.day) return;
 		const info = gameplays.get(game.day) || { word: game.word, numAttempts: 0, times: [] };
 		info.numAttempts++;
-		if (game.time) info.times.push(game.time);
+		if (game.time) info.times.push(Number(game.time));
 		gameplays.set(game.day, info);
 	});
 	const stats = Array.from(gameplays.entries())
@@ -41,7 +41,7 @@ export async function load({ platform }) {
 			word,
 			average: Math.floor(times.reduce((a, b) => a + b, 0) / times.length),
 			numAttempts,
-			numCorrect: times.length
+			numCorrect: times.length,
 		}))
 		.sort((a, b) => b.day - a.day);
 	return { stats };

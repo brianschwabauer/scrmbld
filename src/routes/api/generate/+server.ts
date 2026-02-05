@@ -33,7 +33,7 @@ const aToZ = [
 	'w',
 	'x',
 	'y',
-	'z'
+	'z',
 ];
 const frequency = {
 	e: 12.02,
@@ -61,7 +61,7 @@ const frequency = {
 	x: 0.17,
 	q: 0.11,
 	j: 0.1,
-	z: 0.07
+	z: 0.07,
 };
 const daysSinceStart = Math.max(0, Math.floor((Date.now() - FIRST_DAY) / 86400000));
 
@@ -85,7 +85,7 @@ export function GET({ url }) {
 	// Get the list of words that have been added since the last wordlist was generated
 	// These words should be added to the end of the list so they don't mess up the canonical order
 	const addedWords = words.filter(
-		(word) => !PREVIOUS_WORDLIST.list.some(([previousWord]) => previousWord === word)
+		(word) => !PREVIOUS_WORDLIST.list.some(([previousWord]) => previousWord === word),
 	);
 
 	const allWordHashes = ALL_WORDS.split('\n')
@@ -96,14 +96,14 @@ export function GET({ url }) {
 				prev.push([word, word.split('').sort().join('')]);
 				return prev;
 			},
-			[] as [string, string][]
+			[] as [string, string][],
 		);
 	const wordHashList = words.reduce(
 		(prev, word) => {
 			const hash = word.split('').sort().join('');
 			if (checkFullWordList) {
 				const hashUsedByWordNotInWordlist = allWordHashes.filter(
-					(v) => v && v[0] !== word && v[1] === hash
+					(v) => v && v[0] !== word && v[1] === hash,
 				);
 				if (hashUsedByWordNotInWordlist.length) {
 					hashUsedByWordNotInWordlist.forEach((v) => {
@@ -120,14 +120,14 @@ export function GET({ url }) {
 			prev.push([word, hash]);
 			return prev;
 		},
-		[] as [string, string][]
+		[] as [string, string][],
 	);
 	const wordHashRecord = allWordHashes.reduce(
 		(prev, [word, hash]) => {
 			prev[hash] = word;
 			return prev;
 		},
-		{} as Record<string, string>
+		{} as Record<string, string>,
 	);
 	function doLettersCreateUsedHash(originalHash: string, letters: string[]): boolean {
 		if (letters.length < WORD_LENGTH) return false;
@@ -164,7 +164,7 @@ export function GET({ url }) {
 			const j = Math.floor(random.next().value * (i + 1));
 			[lettersToChooseFrom[i], lettersToChooseFrom[j]] = [
 				lettersToChooseFrom[j],
-				lettersToChooseFrom[i]
+				lettersToChooseFrom[i],
 			];
 		}
 		const additionalLetters: string[] = [];
@@ -212,12 +212,12 @@ export function GET({ url }) {
 	return new Response(
 		JSON.stringify({
 			firstDay: FIRST_DAY,
-			list: list.filter((letters) => letters.length === numExtraLetters + 1)
+			list: list.filter((letters) => letters.length === numExtraLetters + 1),
 		}),
 		{
 			headers: {
-				'content-type': 'application/json; charset=UTF-8'
-			}
-		}
+				'content-type': 'application/json; charset=UTF-8',
+			},
+		},
 	);
 }

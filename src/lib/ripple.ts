@@ -27,7 +27,7 @@ export function ripple(node: HTMLElement, _options: Partial<RippleOptions> = {})
 		enabled: true,
 		zIndex: -1,
 		append: false,
-		..._options
+		..._options,
 	};
 	let destroyed = false;
 	let ripple: HTMLElement | undefined;
@@ -66,13 +66,13 @@ export function ripple(node: HTMLElement, _options: Partial<RippleOptions> = {})
 			if (options.enabled && destroyed) setup();
 			else if (!options.enabled && !destroyed) destroy();
 		},
-		destroy
+		destroy,
 	};
 }
 
 function startRipple(
 	e: TouchEvent | PointerEvent | KeyboardEvent,
-	options: RippleOptions
+	options: RippleOptions,
 ): HTMLElement | undefined {
 	// Parent element
 	const target = ('touches' in e ? e.touches[0].target : e.currentTarget) as HTMLElement;
@@ -151,7 +151,7 @@ function stopRipple(container: HTMLElement | undefined | null) {
 	const ripple = container?.firstElementChild as HTMLElement;
 	if (!ripple) return;
 	const shortestRunningAnimation = Math.min(
-		...ripple.getAnimations().map((animation) => parseInt(`${animation.currentTime}`) || Infinity)
+		...ripple.getAnimations().map((animation) => parseInt(`${animation.currentTime}`) || Infinity),
 	);
 	setTimeout(
 		() => {
@@ -160,6 +160,6 @@ function stopRipple(container: HTMLElement | undefined | null) {
 			});
 			ripple.style.opacity = `0`;
 		},
-		Math.max(0, 250 - shortestRunningAnimation)
+		Math.max(0, 250 - shortestRunningAnimation),
 	);
 }

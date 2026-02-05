@@ -13,9 +13,9 @@ export function getDailyWord() {
 		yesterday: {
 			day: today - 86400000,
 			word: yesterdayWord[0],
-			extraLetters: yesterdayWord.slice(1)
+			extraLetters: yesterdayWord.slice(1),
 		},
 		today: { day: today, word: todayWord[0], extraLetters: todayWord.slice(1) },
-		tomorrow: { day: today + 86400000, word: tomorrowWord[0], extraLetters: tomorrowWord.slice(1) }
+		tomorrow: { day: today + 86400000, word: tomorrowWord[0], extraLetters: tomorrowWord.slice(1) },
 	};
 }

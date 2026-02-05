@@ -41,7 +41,13 @@
 		</div>
 		<div class="field">
 			<label for="confirm-password">Confirm Password</label>
-			<input id="confirm-password" type="password" bind:value={confirmPassword} required minlength="8" />
+			<input
+				id="confirm-password"
+				type="password"
+				bind:value={confirmPassword}
+				required
+				minlength="8"
+			/>
 		</div>
 		{#if error}
 			<p class="error">{error}</p>

@@ -59,14 +59,14 @@
 		{#if data.isNewSignup}
 			<h1>Account Created!</h1>
 			<p class="description">
-				We've sent a verification link to <strong>{data.email}</strong>. Please check your inbox
-				and click the link to complete your account setup.
+				We've sent a verification link to <strong>{data.email}</strong>. Please check your inbox and
+				click the link to complete your account setup.
 			</p>
 		{:else}
 			<h1>Verify Your Email</h1>
 			<p class="description">
-				We've sent a verification link to <strong>{data.email}</strong>. Please check your inbox
-				and click the link to verify your email address.
+				We've sent a verification link to <strong>{data.email}</strong>. Please check your inbox and
+				click the link to verify your email address.
 			</p>
 		{/if}
 

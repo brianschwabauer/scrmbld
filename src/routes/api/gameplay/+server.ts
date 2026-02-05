@@ -81,7 +81,7 @@ export async function POST({ cookies, request, getClientAddress, platform }) {
 			ua_browser,
 			ua_os,
 			ua_device
-	 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		)
 		.bind(
 			uuid,
@@ -100,7 +100,7 @@ export async function POST({ cookies, request, getClientAddress, platform }) {
 			ua,
 			parsedUA?.browser?.name || null,
 			parsedUA?.os?.name || null,
-			[parsedUA?.device?.vendor, parsedUA?.device?.model].filter(Boolean).join(' ') || null
+			[parsedUA?.device?.vendor, parsedUA?.device?.model].filter(Boolean).join(' ') || null,
 		)
 		.run();
 	if (result.success) {
@@ -111,6 +111,6 @@ export async function POST({ cookies, request, getClientAddress, platform }) {
 	if (!result.success) throw error(500, `Couldn't save gameplay to database`);
 	return new Response(JSON.stringify({ uuid }), {
 		status: 201,
-		headers: { Location: `/api/gameplay/${uuid}/finish`, 'Content-Type': 'application/json' }
+		headers: { Location: `/api/gameplay/${uuid}/finish`, 'Content-Type': 'application/json' },
 	});
 }
