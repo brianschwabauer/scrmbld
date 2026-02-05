@@ -1,5 +1,27 @@
 // See https://kit.svelte.dev/docs/types#app
 // for information about these interfaces
+
+/** Service binding to the notifications DO worker */
+interface NotificationsService {
+	subscribe(data: {
+		userId: string;
+		endpoint: string;
+		p256dh: string;
+		auth: string;
+		timezone?: string;
+	}): Promise<{ success: boolean }>;
+	unsubscribe(userId: string): Promise<{ success: boolean }>;
+	played(userId: string, day: number): Promise<{ success: boolean }>;
+	status(): Promise<{
+		subscriptions: number;
+		sentToday: number;
+		nextAlarm: number | null;
+		timezones: Record<string, number>;
+	}>;
+	trigger(): Promise<{ success: boolean; message: string }>;
+	initAlarm(): Promise<{ success: boolean; message: string }>;
+}
+
 declare global {
 	namespace App {
 		// interface Error {}
@@ -20,6 +42,9 @@ declare global {
 			RESEND_API_KEY: string;
 			GOOGLE_CLIENT_ID: string;
 			GOOGLE_CLIENT_SECRET: string;
+			VAPID_PUBLIC_KEY: string;
+			VAPID_PRIVATE_KEY: string;
+			NOTIFICATIONS: NotificationsService;
 		}
 	}
 }

@@ -33,6 +33,12 @@
 			"database_name": "scrmbld",
 		},
 	],
+	"services": [
+		{
+			"binding": "NOTIFICATIONS",
+			"service": "scrmbld-notifications",
+		},
+	],
 	"env": {
 		"preview": {
 			"d1_databases": [
@@ -40,6 +46,12 @@
 					"binding": "D1",
 					"database_id": "74bed334-9c30-43a3-82a5-9bd546b149ce",
 					"database_name": "scrmbld-staging",
+				},
+			],
+			"services": [
+				{
+					"binding": "NOTIFICATIONS",
+					"service": "scrmbld-notifications",
 				},
 			],
 		},

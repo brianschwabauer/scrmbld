@@ -1,0 +1,35 @@
+{
+	"$schema": "../../node_modules/wrangler/config-schema.json",
+	"name": "scrmbld-notifications",
+	"main": "index.ts",
+	"compatibility_date": "2024-12-01",
+	"compatibility_flags": ["nodejs_compat"],
+
+	"durable_objects": {
+		"bindings": [
+			{
+				"name": "NOTIFICATION_SCHEDULER",
+				"class_name": "NotificationScheduler",
+			},
+		],
+	},
+
+	"migrations": [
+		{
+			"tag": "v1",
+			"new_sqlite_classes": ["NotificationScheduler"],
+		},
+	],
+
+	"d1_databases": [
+		{
+			"binding": "D1",
+			"database_id": "864ce78f-d55c-425a-ba45-7d770e8c1f5b",
+			"database_name": "scrmbld",
+		},
+	],
+
+	// Secrets to set:
+	// wrangler secret put VAPID_PUBLIC_KEY -c workers/notifications/wrangler.jsonc
+	// wrangler secret put VAPID_PRIVATE_KEY -c workers/notifications/wrangler.jsonc
+}
