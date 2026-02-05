@@ -1,5 +1,7 @@
 import { error } from '@sveltejs/kit';
 import { type GamePlay } from '../../gameplay.type';
+import { createDb } from '$lib/server/db';
+import { checkAndAwardAchievements } from '$lib/server/check-achievements';
 
 export async function POST({ request, platform, params }) {
 	const d1 = platform?.env?.D1;
@@ -34,8 +36,9 @@ export async function POST({ request, platform, params }) {
 	}
 	if (!time) time = now - gameplay.started_at;
 	const num_hints = Math.max(0, Math.min(body?.num_hints || 0, gameplay.word.length + 1));
+	const timezone = typeof body?.timezone === 'string' ? body.timezone : undefined;
 	console.log(
-		`Finishing gameplay for ${gameplay.day} with word ${gameplay.word}: ${gameplay.user_uuid}`
+		`Finishing gameplay for ${gameplay.day} with word ${gameplay.word}: ${gameplay.user_uuid}`,
 	);
 
 	// Update the gameplay record to show that it has been finished
@@ -46,7 +49,7 @@ export async function POST({ request, platform, params }) {
 				json = ?,
 				time = ?,
 				num_hints = ?
-			WHERE uuid = ?`
+			WHERE uuid = ?`,
 		)
 		.bind(now, JSON.stringify({ times }), time, num_hints, uuid)
 		.run();
@@ -56,5 +59,35 @@ export async function POST({ request, platform, params }) {
 		console.log(`Ran query unsuccessfully`, result.error, result);
 	}
 	if (!result.success) throw error(500, `Couldn't save gameplay to database`);
-	return new Response(null, { status: 204 });
+
+	// Check and award achievements for signed-in users
+	let newAchievements: string[] = [];
+	if (gameplay.user_id) {
+		try {
+			const db = createDb(d1);
+			newAchievements = await checkAndAwardAchievements(db, gameplay.user_id, {
+				time,
+				numHints: num_hints,
+				day: gameplay.day,
+				timezone,
+			});
+		} catch (e) {
+			console.error('Achievement check failed', e);
+		}
+
+		// Notify the DO that this user has played today (so we don't send a reminder)
+		if (platform?.env?.NOTIFICATIONS) {
+			try {
+				await platform.env.NOTIFICATIONS.played(gameplay.user_id, gameplay.day);
+			} catch (e) {
+				console.error('Failed to notify DO worker:', e);
+			}
+		}
+	}
+
+	// Return newly unlocked achievements (empty array if none or not signed in)
+	return new Response(JSON.stringify({ newAchievements }), {
+		status: 200,
+		headers: { 'Content-Type': 'application/json' },
+	});
 }

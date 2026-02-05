@@ -12,6 +12,7 @@ export const user = sqliteTable('user', {
 	updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
 	username: text('username').unique(),
 	profileVisibility: text('profile_visibility').default('public'),
+	timezone: text('timezone'), // IANA timezone (e.g., "America/New_York")
 });
 
 export const session = sqliteTable('session', {
@@ -71,11 +72,39 @@ export const friendship = sqliteTable('friendship', {
 export const gameplay = sqliteTable('gameplay', {
 	id: integer('id').primaryKey({ autoIncrement: true }),
 	uuid: text('uuid').notNull(),
+	word: text('word').notNull(),
 	userUuid: text('user_uuid').notNull(), // The anonymous cookie id
 	userId: text('user_id').references(() => user.id), // The real user id (nullable)
 	day: integer('day').notNull(),
 	startedAt: integer('started_at').notNull(),
 	endedAt: integer('ended_at'),
 	time: numeric('time'),
-	won: integer('won', { mode: 'boolean' }), // Assuming won is derived or stored
+	numHints: integer('num_hints'),
+	json: text('json'),
+});
+
+// Achievement table for user badges
+export const achievement = sqliteTable('achievement', {
+	id: text('id').primaryKey(),
+	userId: text('user_id')
+		.notNull()
+		.references(() => user.id),
+	achievementId: text('achievement_id').notNull(),
+	unlockedAt: integer('unlocked_at', { mode: 'timestamp' }).notNull(),
+});
+
+// Push notification subscriptions
+export const pushSubscription = sqliteTable('push_subscription', {
+	id: text('id').primaryKey(),
+	userId: text('user_id')
+		.notNull()
+		.references(() => user.id),
+	endpoint: text('endpoint').notNull(),
+	p256dh: text('p256dh').notNull(),
+	auth: text('auth').notNull(),
+	timezone: text('timezone'),
+	notifyDailyReminder: integer('notify_daily_reminder').notNull().default(1),
+	notifyFriendActivity: integer('notify_friend_activity').notNull().default(1),
+	notifyWeeklyRecap: integer('notify_weekly_recap').notNull().default(1),
+	createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 });

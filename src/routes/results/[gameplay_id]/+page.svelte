@@ -5,9 +5,10 @@
 	import Expand from '$lib/Expand.svelte';
 	import FlipText from '$lib/FlipText.svelte';
 	import BottomNav from '$lib/BottomNav.svelte';
+	import StreakCelebration from '$lib/StreakCelebration.svelte';
 	import { tooltip } from '$lib/tootltip';
-	import Confetti from 'svelte-confetti';
 	import { SvelteSet } from 'svelte/reactivity';
+	import { ACHIEVEMENT_MAP } from '$lib/achievements';
 
 	const { data } = $props();
 
@@ -30,6 +31,13 @@
 	);
 	const shareURL = $derived.by(() => {
 		const url = new URL(page.url.href);
+		url.search = '';
+		url.hash = '';
+		return url.href;
+	});
+	const shareImageUrl = $derived.by(() => {
+		const url = new URL(page.url.href);
+		url.pathname = `/api/share/${data.gameplayId}.png`;
 		url.search = '';
 		url.hash = '';
 		return url.href;
@@ -114,23 +122,47 @@
 	});
 </script>
 
+<svelte:head>
+	<meta property="og:title" content="SCRMBLD - {getTimeDisplay(data.time)}" />
+	<meta
+		property="og:description"
+		content="I solved SCRMBLD in {getTimeDisplay(data.time)}. Can you beat my time?"
+	/>
+	<meta property="og:image" content={shareImageUrl} />
+	<meta property="og:image:width" content="1200" />
+	<meta property="og:image:height" content="630" />
+	<meta name="twitter:card" content="summary_large_image" />
+	<meta name="twitter:image" content={shareImageUrl} />
+</svelte:head>
+
 <article class:has-nav={layoutData.session}>
-	{#if showConfetti}
-		<!-- <div class="confetti">
-			<Confetti
-				colorRange={[120, 250]}
-				x={[-5, 5]}
-				y={[0, 8]}
-				amount={200}
-				destroyOnComplete
-				disableForReducedMotion
-				rounded
-				duration={4000}
-				fallDistance="200px"
-				iterationCount={1}
-			/>
-		</div> -->
+	{#if showConfetti && data.isCurrentUser}
+		<StreakCelebration
+			streak={data.userStreak}
+			show={showConfetti}
+			onfinish={() => (showConfetti = false)}
+		/>
 	{/if}
+	{#if data.newAchievements && data.newAchievements.length > 0 && data.isCurrentUser}
+		<div class="achievements-unlocked">
+			<h2>Achievement{data.newAchievements.length > 1 ? 's' : ''} Unlocked!</h2>
+			<div class="achievement-list">
+				{#each data.newAchievements as achievementId, i}
+					{@const achievement = ACHIEVEMENT_MAP[achievementId]}
+					{#if achievement}
+						<div class="achievement" style="animation-delay: {i * 150}ms">
+							<span class="achievement-icon">{achievement.icon}</span>
+							<div class="achievement-info">
+								<span class="achievement-name">{achievement.name}</span>
+								<span class="achievement-desc">{achievement.description}</span>
+							</div>
+						</div>
+					{/if}
+				{/each}
+			</div>
+		</div>
+	{/if}
+
 	<h1>
 		{#if data.isCurrentUser}
 			You solved SCRMBLD
@@ -235,8 +267,8 @@
 					{#each { length: numStreakWeeks } as _, i}
 						<div class="week">
 							{#each { length: 7 } as _, j}
-								{@const dayOfWeek = new Date(data.day).getUTCDay()}
-								{@const day = data.day - (dayOfWeek - 6 + (i * 7 + j)) * 24 * 60 * 60 * 1000}
+								{@const daysSinceMonday = (new Date(data.day).getUTCDay() + 6) % 7}
+								{@const day = data.day - (daysSinceMonday - 6 + (i * 7 + j)) * 24 * 60 * 60 * 1000}
 								{@const result = data.userHistory[`${day}`]}
 								{@const date = new Date(day).toLocaleDateString(undefined, {
 									timeZone: 'UTC',
@@ -254,20 +286,21 @@
 											? `${date} - Solved in ${getTimeDisplay(result)}`
 											: `${date} - Failed to solve`}
 								>
-									<!-- {#if j === 0}
-									S
+									<!-- Days are displayed right-to-left: j=0 is Sunday (end of week), j=6 is Monday (start of week)
+								{#if j === 0}
+									Su
 								{:else if j === 1}
-									F
+									Sa
 								{:else if j === 2}
-									T
+									F
 								{:else if j === 3}
-									W
+									Th
 								{:else if j === 4}
-									T
+									W
 								{:else if j === 5}
-									M
+									Tu
 								{:else if j === 6}
-									S
+									M
 								{/if} -->
 								</span>
 							{/each}
@@ -308,6 +341,14 @@
 			{/if}
 			<small>{shareURL}</small>
 		</button>
+		<!-- <a
+			class="button two-line"
+			href="/api/share/{data.gameplayId}.png"
+			download="scrmbld-{getTimeDisplay(data.time).replace(':', '-')}.png"
+		>
+			Download Image
+			<small>Share on social media</small>
+		</a> -->
 	{/if}
 
 	{#if !data.session}
@@ -465,6 +506,75 @@
 		margin-top: 1.5rem;
 		padding-top: 1.5rem;
 		border-top: 1px solid #444444;
+	}
+
+	.achievements-unlocked {
+		margin: 1.5rem 0;
+		padding: 1rem;
+		background: rgba(2, 207, 183, 0.1);
+		border: 1px solid rgba(2, 207, 183, 0.3);
+		border-radius: 8px;
+		text-align: center;
+		width: calc(100vw - 2rem);
+		max-width: 400px;
+		box-sizing: border-box;
+
+		h2 {
+			font-size: 1rem;
+			font-weight: 500;
+			margin: 0 0 0.75rem;
+			color: #02cfb7;
+		}
+	}
+
+	.achievement-list {
+		display: flex;
+		flex-direction: column;
+		gap: 0.75rem;
+	}
+
+	.achievement {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		padding: 0.5rem;
+		background: rgba(255, 255, 255, 0.05);
+		border-radius: 6px;
+		animation: achievementPop 0.4s ease-out backwards;
+	}
+
+	@keyframes achievementPop {
+		from {
+			opacity: 0;
+			transform: scale(0.8) translateY(10px);
+		}
+		to {
+			opacity: 1;
+			transform: scale(1) translateY(0);
+		}
+	}
+
+	.achievement-icon {
+		font-size: 1.5rem;
+		line-height: 1;
+	}
+
+	.achievement-info {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		text-align: left;
+	}
+
+	.achievement-name {
+		font-size: 0.95rem;
+		font-weight: 500;
+		color: #eeeeee;
+	}
+
+	.achievement-desc {
+		font-size: 0.8rem;
+		color: #bbbbbb;
 	}
 
 	.streak {

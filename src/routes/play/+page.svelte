@@ -355,7 +355,8 @@
 		const state = JSON.stringify({
 			json: { times },
 			num_hints: numHintsUsed,
-		} as Partial<GamePlay>);
+			timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+		});
 		window.location.href = `/results/${gameplayID}?state=${btoa(state).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')}`;
 	}
 

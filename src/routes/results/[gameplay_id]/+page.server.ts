@@ -1,5 +1,7 @@
 import { error } from '@sveltejs/kit';
 import { initAuth } from '$lib/server/auth';
+import { createDb } from '$lib/server/db';
+import { checkAndAwardAchievements } from '$lib/server/check-achievements';
 import type { GamePlay } from '../../api/gameplay/gameplay.type';
 
 export async function load({ platform, params, cookies, url, request }) {
@@ -50,6 +52,10 @@ export async function load({ platform, params, cookies, url, request }) {
 		}
 		if (!time) time = now - gameplay.started_at;
 		const num_hints = Math.max(0, Math.min(state?.num_hints || 0, gameplay.word.length + 1));
+		const timezone =
+			typeof (state as { timezone?: string })?.timezone === 'string'
+				? (state as { timezone?: string }).timezone
+				: undefined;
 		console.log(
 			`Finishing gameplay for ${gameplay.day} with word ${gameplay.word}: ${gameplay.user_uuid}`,
 		);
@@ -75,11 +81,38 @@ export async function load({ platform, params, cookies, url, request }) {
 		gameplay.time = time;
 		gameplay.num_hints = num_hints;
 		gameplay.json = { times };
+
+		// Award achievements for signed-in users when finishing via fallback path
+		if (gameplay.user_id) {
+			try {
+				const db = createDb(D1);
+				const newAchievements = await checkAndAwardAchievements(db, gameplay.user_id, {
+					time,
+					numHints: num_hints,
+					day: gameplay.day,
+					timezone,
+				});
+				// Store for later return
+				(gameplay as GamePlay & { newAchievements?: string[] }).newAchievements = newAchievements;
+			} catch (e) {
+				console.error('Achievement check failed', e);
+			}
+
+			// Notify the DO that this user has played today (so we don't send a reminder)
+			if (platform?.env?.NOTIFICATIONS) {
+				try {
+					await platform.env.NOTIFICATIONS.played(gameplay.user_id, gameplay.day);
+				} catch (e) {
+					console.error('Failed to notify DO worker:', e);
+				}
+			}
+		}
 	}
 
 	const fiftyTwoWeeksAgo = new Date(gameplay.day).setUTCDate(
-		// 52 weeeks ago, adjusted to the start of that week (Sunday)
-		new Date(gameplay.day).getUTCDate() - new Date(gameplay.day).getUTCDay() - 52 * 7,
+		// 52 weeks ago, adjusted to the start of that week (Monday)
+		// getUTCDay() returns 0=Sun, 1=Mon, ..., 6=Sat; (day + 6) % 7 gives days since Monday
+		new Date(gameplay.day).getUTCDate() - ((new Date(gameplay.day).getUTCDay() + 6) % 7) - 52 * 7,
 	);
 
 	// Query user results by user_id if the gameplay has one, otherwise by user_uuid
@@ -105,35 +138,45 @@ export async function load({ platform, params, cookies, url, request }) {
 	const userResults = [...userResultsQuery.results.sort((a, b) => b.day - a.day)];
 	const todaysResults = todaysResultsQuery.results;
 	const averageForDay =
-		todaysResults.reduce((acc, curr) => acc + Math.min(180000, curr.time || 0), 0) /
+		todaysResults.reduce((acc, curr) => acc + Math.min(180000, Number(curr.time) || 0), 0) /
 			todaysResults.length || 0;
 	const LIMIT_RESULTS_TO_STANDARD_DEVIATION = false; // Whether to limit results to within a certain standard deviation
 	const STANDARD_DEVIATION_THRESHOLD = 1.5; // Number of standard deviations to filter by. Lower values include less results.
 	const standardDeviation = Math.sqrt(
-		todaysResults.reduce((acc, curr) => acc + Math.pow((curr.time || 0) - averageForDay, 2), 0) /
-			todaysResults.length || 0,
+		todaysResults.reduce(
+			(acc, curr) => acc + Math.pow((Number(curr.time) || 0) - averageForDay, 2),
+			0,
+		) / todaysResults.length || 0,
 	);
 	const fastestTime = todaysResults
 		.filter(
 			(result) =>
 				result.time &&
 				(!LIMIT_RESULTS_TO_STANDARD_DEVIATION ||
-					(result.time >= averageForDay - STANDARD_DEVIATION_THRESHOLD * standardDeviation &&
-						result.time <= averageForDay + STANDARD_DEVIATION_THRESHOLD * standardDeviation)),
+					(Number(result.time) >=
+						averageForDay - STANDARD_DEVIATION_THRESHOLD * standardDeviation &&
+						Number(result.time) <=
+							averageForDay + STANDARD_DEVIATION_THRESHOLD * standardDeviation)),
 		)
-		.map((result) => result.time || 0)
-		.reduce((min, curr) => (curr < min ? curr : min), gameplay.time || Infinity);
+		.map((result) => Number(result.time) || 0)
+		.reduce((min, curr) => (curr < min ? curr : min), Number(gameplay.time) || Infinity);
 
 	const userWeeklyAverageResults = userResults.filter(
 		(result) => result.time && result.day >= gameplay.day - 7 * 86400000,
 	);
 	const userWeeklyAverage =
-		userWeeklyAverageResults.reduce((acc, curr) => acc + Math.min(180000, curr.time || 0), 0) /
-		(userWeeklyAverageResults.length || 1);
+		userWeeklyAverageResults.reduce(
+			(acc, curr) => acc + Math.min(180000, Number(curr.time) || 0),
+			0,
+		) / (userWeeklyAverageResults.length || 1);
 
+	// Calculate streak - deduplicate days first (user might have multiple games per day)
+	const uniqueDays = [...new Set(userResults.filter((r) => r.time).map((r) => r.day))].sort(
+		(a, b) => b - a,
+	);
 	let userStreak = 0;
-	for (const { time, day } of userResults) {
-		if (time && day === gameplay.day - 86400000 * userStreak) {
+	for (let i = 0; i < uniqueDays.length; i++) {
+		if (uniqueDays[i] === gameplay.day - 86400000 * i) {
 			userStreak++;
 		} else {
 			break;
@@ -146,14 +189,15 @@ export async function load({ platform, params, cookies, url, request }) {
 		(user_uuid && user_uuid === gameplay.user_uuid);
 
 	return {
+		gameplayId: params.gameplay_id,
 		day: gameplay.day,
 		word: gameplay.word,
-		time: gameplay.time || 0,
+		time: Number(gameplay.time) || 0,
 		userWeeklyAverage,
 		userStreak,
 		userHistory: userResults.reduce(
 			(acc, curr) => {
-				acc[`${curr.day}`] = curr.time ?? null;
+				acc[`${curr.day}`] = curr.time != null ? Number(curr.time) : null;
 				return acc;
 			},
 			{} as Record<string, number | null>,
@@ -163,5 +207,6 @@ export async function load({ platform, params, cookies, url, request }) {
 		numHintsUsed: gameplay.num_hints || 0,
 		isCurrentUser,
 		isSignedIn: !!sessionUserId,
+		newAchievements: (gameplay as GamePlay & { newAchievements?: string[] }).newAchievements || [],
 	};
 }
