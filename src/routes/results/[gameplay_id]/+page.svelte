@@ -18,6 +18,7 @@
 	let shareButtonEl = $state<HTMLButtonElement | undefined>(undefined);
 	let showConfetti = $state(false);
 	let viewDetailedResults = $state(false);
+	let signInBannerDismissed = $state(false);
 	const useNativeShare = $derived(
 		browser &&
 			typeof navigator !== undefined &&
@@ -350,14 +351,17 @@
 			<small>Share on social media</small>
 		</a> -->
 	{/if}
-
-	{#if !data.session}
-		<a href="/signin?from=results" class="button two-line">
-			Sign In
-			<small>to save score</small>
-		</a>
-	{/if}
 </article>
+
+{#if !layoutData.session && data.isCurrentUser && !signInBannerDismissed}
+	<div class="sign-in-banner">
+		<button class="dismiss" onclick={() => (signInBannerDismissed = true)} aria-label="Dismiss">
+			&times;
+		</button>
+		<p>Sign in to track your streak, compete with friends, and save your stats!</p>
+		<a href="/signin?from=results" class="sign-in-btn">Sign In</a>
+	</div>
+{/if}
 
 {#if layoutData.session}
 	<BottomNav
@@ -629,6 +633,89 @@
 				background-color: #00b7a1;
 				color: #ffffff;
 			}
+		}
+	}
+
+	.sign-in-banner {
+		position: fixed;
+		bottom: 0;
+		left: 0;
+		right: 0;
+		background-color: #333333;
+		border-top: 1px solid #555555;
+		padding: 0.75rem 1rem calc(0.75rem + env(safe-area-inset-bottom)) 1rem;
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		z-index: 100;
+		animation: slideUp 0.3s ease-out;
+
+		p {
+			margin: 0;
+			font-size: 0.8rem;
+			color: #bbbbbb;
+			flex: 1;
+			line-height: 1.3;
+			text-wrap: pretty;
+		}
+
+		.sign-in-btn {
+			flex-shrink: 0;
+			display: inline-block;
+			width: auto;
+			max-width: none;
+			background-color: #eeeeee;
+			color: #333333;
+			font-family: 'Roboto Mono', monospace;
+			font-size: 0.85rem;
+			font-weight: 500;
+			padding: 0.5em 1em;
+			border-radius: 4px;
+			border: none;
+			box-shadow: 0 4px 0 #999999;
+			text-decoration: none;
+			white-space: nowrap;
+			margin: 0;
+			transition: transform 0.07s;
+
+			&:hover {
+				background-color: #ffffff;
+				color: #000000;
+			}
+			&:active {
+				transform: translateY(4px);
+				box-shadow: none;
+			}
+		}
+
+		.dismiss {
+			flex-shrink: 0;
+			width: auto;
+			max-width: none;
+			background: none;
+			border: none;
+			box-shadow: none;
+			color: #888888;
+			font-size: 1.25rem;
+			cursor: pointer;
+			padding: 0;
+			line-height: 1;
+
+			&:hover {
+				color: #eeeeee;
+			}
+			&:active {
+				transform: none;
+			}
+		}
+	}
+
+	@keyframes slideUp {
+		from {
+			transform: translateY(100%);
+		}
+		to {
+			transform: translateY(0);
 		}
 	}
 </style>
