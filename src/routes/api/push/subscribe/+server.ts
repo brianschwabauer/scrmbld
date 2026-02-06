@@ -4,6 +4,36 @@ import { createDb } from '$lib/server/db';
 import { pushSubscription } from '$lib/server/schema';
 import { and, eq } from 'drizzle-orm';
 
+/** Generate a device ID from the push endpoint (first 16 hex chars of SHA-256) */
+async function generateDeviceId(endpoint: string): Promise<string> {
+	const data = new TextEncoder().encode(endpoint);
+	const hash = await crypto.subtle.digest('SHA-256', data);
+	const bytes = new Uint8Array(hash);
+	return Array.from(bytes.slice(0, 8))
+		.map((b) => b.toString(16).padStart(2, '0'))
+		.join('');
+}
+
+/** Parse User-Agent into a human-readable device name */
+function parseDeviceName(userAgent: string): string {
+	let browser = 'Unknown Browser';
+	let os = 'Unknown OS';
+
+	if (userAgent.includes('Firefox/')) browser = 'Firefox';
+	else if (userAgent.includes('Edg/')) browser = 'Edge';
+	else if (userAgent.includes('Chrome/') && !userAgent.includes('Edg/')) browser = 'Chrome';
+	else if (userAgent.includes('Safari/') && !userAgent.includes('Chrome/')) browser = 'Safari';
+
+	if (userAgent.includes('iPhone') || userAgent.includes('iPad')) os = 'iOS';
+	else if (userAgent.includes('Android')) os = 'Android';
+	else if (userAgent.includes('Mac OS X')) os = 'macOS';
+	else if (userAgent.includes('Windows')) os = 'Windows';
+	else if (userAgent.includes('Linux')) os = 'Linux';
+	else if (userAgent.includes('CrOS')) os = 'ChromeOS';
+
+	return `${browser} on ${os}`;
+}
+
 export const POST: RequestHandler = async ({ request, platform }) => {
 	if (!platform?.env?.D1) {
 		return new Response(JSON.stringify({ error: 'Database unavailable' }), {
@@ -49,6 +79,8 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 	}
 
 	const db = createDb(platform.env.D1);
+	const deviceId = await generateDeviceId(body.endpoint);
+	const deviceName = parseDeviceName(request.headers.get('User-Agent') || '');
 
 	// Check if subscription already exists for this user and endpoint
 	const existing = await db.query.pushSubscription.findFirst({
@@ -66,6 +98,8 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 				p256dh: body.keys.p256dh,
 				auth: body.keys.auth,
 				timezone: body.timezone || null,
+				deviceName,
+				deviceId,
 			})
 			.where(eq(pushSubscription.id, existing.id));
 	} else {
@@ -77,6 +111,8 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 			p256dh: body.keys.p256dh,
 			auth: body.keys.auth,
 			timezone: body.timezone || null,
+			deviceName,
+			deviceId,
 			createdAt: new Date(),
 		});
 	}
@@ -90,6 +126,8 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 				p256dh: body.keys.p256dh,
 				auth: body.keys.auth,
 				timezone: body.timezone || 'UTC',
+				deviceName,
+				deviceId,
 			});
 		} catch (error) {
 			console.error('Failed to notify DO worker:', error);

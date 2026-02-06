@@ -132,12 +132,41 @@
 	}
 
 	// Notifications section state
-	let notificationsEnabled = $state(data.hasNotifications ?? false);
+	let devices = $state(data.pushDevices ?? []);
 	let notificationsLoading = $state(false);
+	let devicesLoading = $state(false);
 	let notificationsError = $state('');
+	let currentDeviceId = $state<string | null>(null);
 	let prefDailyReminder = $state(data.notificationPrefs?.dailyReminder ?? true);
 	let prefFriendActivity = $state(data.notificationPrefs?.friendActivity ?? true);
 	let prefWeeklyRecap = $state(data.notificationPrefs?.weeklyRecap ?? true);
+
+	let hasAnyDevice = $derived(devices.length > 0);
+	let isCurrentDeviceRegistered = $derived(
+		currentDeviceId !== null && devices.some((d) => d.deviceId === currentDeviceId),
+	);
+
+	/** Compute device ID (SHA-256 of endpoint, first 16 hex chars) to match server-side */
+	async function computeDeviceId(endpoint: string): Promise<string> {
+		const data = new TextEncoder().encode(endpoint);
+		const hash = await crypto.subtle.digest('SHA-256', data);
+		const bytes = new Uint8Array(hash);
+		return Array.from(bytes.slice(0, 8))
+			.map((b) => b.toString(16).padStart(2, '0'))
+			.join('');
+	}
+
+	// Detect current device's push subscription on mount
+	$effect(() => {
+		if (typeof window !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window) {
+			navigator.serviceWorker.ready.then(async (reg) => {
+				const sub = await reg.pushManager.getSubscription();
+				if (sub?.endpoint) {
+					currentDeviceId = await computeDeviceId(sub.endpoint);
+				}
+			});
+		}
+	});
 
 	function updatePreference(key: string, value: boolean) {
 		fetch('/api/push/preferences', {
@@ -147,67 +176,107 @@
 		});
 	}
 
-	async function toggleNotifications() {
+	async function addCurrentDevice() {
 		notificationsLoading = true;
 		notificationsError = '';
 
 		try {
-			if (notificationsEnabled) {
-				// Disable notifications
-				const registration = await navigator.serviceWorker.ready;
-				const subscription = await registration.pushManager.getSubscription();
-				if (subscription) {
-					await fetch('/api/push/unsubscribe', {
-						method: 'POST',
-						headers: { 'Content-Type': 'application/json' },
-						body: JSON.stringify({ endpoint: subscription.endpoint }),
-					});
-					await subscription.unsubscribe();
-				}
-				notificationsEnabled = false;
-			} else {
-				// Enable notifications
-				const permission = await Notification.requestPermission();
-				if (permission !== 'granted') {
-					notificationsError = 'Notification permission denied';
-					return;
-				}
-
-				const registration = await navigator.serviceWorker.ready;
-				const subscription = await registration.pushManager.subscribe({
-					userVisibleOnly: true,
-					applicationServerKey: data.vapidPublicKey,
-				});
-
-				const response = await fetch('/api/push/subscribe', {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({
-						endpoint: subscription.endpoint,
-						keys: {
-							p256dh: btoa(String.fromCharCode(...new Uint8Array(subscription.getKey('p256dh')!)))
-								.replace(/\+/g, '-')
-								.replace(/\//g, '_')
-								.replace(/=+$/, ''),
-							auth: btoa(String.fromCharCode(...new Uint8Array(subscription.getKey('auth')!)))
-								.replace(/\+/g, '-')
-								.replace(/\//g, '_')
-								.replace(/=+$/, ''),
-						},
-						timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-					}),
-				});
-
-				if (!response.ok) {
-					throw new Error('Failed to save subscription');
-				}
-
-				notificationsEnabled = true;
+			const permission = await Notification.requestPermission();
+			if (permission !== 'granted') {
+				notificationsError = 'Notification permission denied';
+				return;
 			}
+
+			const registration = await navigator.serviceWorker.ready;
+			const subscription = await registration.pushManager.subscribe({
+				userVisibleOnly: true,
+				applicationServerKey: data.vapidPublicKey,
+			});
+
+			const response = await fetch('/api/push/subscribe', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					endpoint: subscription.endpoint,
+					keys: {
+						p256dh: btoa(String.fromCharCode(...new Uint8Array(subscription.getKey('p256dh')!)))
+							.replace(/\+/g, '-')
+							.replace(/\//g, '_')
+							.replace(/=+$/, ''),
+						auth: btoa(String.fromCharCode(...new Uint8Array(subscription.getKey('auth')!)))
+							.replace(/\+/g, '-')
+							.replace(/\//g, '_')
+							.replace(/=+$/, ''),
+					},
+					timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+				}),
+			});
+
+			if (!response.ok) throw new Error('Failed to save subscription');
+
+			currentDeviceId = await computeDeviceId(subscription.endpoint);
+			await refreshDevices();
 		} catch (e) {
-			notificationsError = e instanceof Error ? e.message : 'Failed to update notifications';
+			notificationsError = e instanceof Error ? e.message : 'Failed to add device';
 		} finally {
 			notificationsLoading = false;
+		}
+	}
+
+	async function removeDevice(deviceId: string) {
+		devicesLoading = true;
+		notificationsError = '';
+
+		try {
+			// If removing current device, also unsubscribe browser
+			if (deviceId === currentDeviceId) {
+				const registration = await navigator.serviceWorker.ready;
+				const subscription = await registration.pushManager.getSubscription();
+				if (subscription) await subscription.unsubscribe();
+				currentDeviceId = null;
+			}
+
+			await fetch('/api/push/unsubscribe', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ deviceId }),
+			});
+
+			devices = devices.filter((d) => d.deviceId !== deviceId);
+		} catch (e) {
+			notificationsError = e instanceof Error ? e.message : 'Failed to remove device';
+		} finally {
+			devicesLoading = false;
+		}
+	}
+
+	async function removeAllDevices() {
+		devicesLoading = true;
+		notificationsError = '';
+
+		try {
+			// Unsubscribe current browser if applicable
+			if ('serviceWorker' in navigator) {
+				const registration = await navigator.serviceWorker.ready;
+				const subscription = await registration.pushManager.getSubscription();
+				if (subscription) await subscription.unsubscribe();
+			}
+			currentDeviceId = null;
+
+			await fetch('/api/push/unsubscribe-all', { method: 'POST' });
+			devices = [];
+		} catch (e) {
+			notificationsError = e instanceof Error ? e.message : 'Failed to remove devices';
+		} finally {
+			devicesLoading = false;
+		}
+	}
+
+	async function refreshDevices() {
+		const response = await fetch('/api/push/devices');
+		if (response.ok) {
+			const result = (await response.json()) as { devices: typeof devices };
+			devices = result.devices;
 		}
 	}
 
@@ -357,25 +426,90 @@
 	<section>
 		<h2>Notifications</h2>
 		{#if notificationsSupported}
-			<div class="notification-toggle">
-				<div class="toggle-info">
-					<span class="toggle-label">Push Notifications</span>
-					<span class="toggle-description">Enable push notifications from SCRMBLD</span>
+			{#if hasAnyDevice}
+				<div class="device-list">
+					{#each devices as device, i (device.deviceId ?? `legacy-${i}`)}
+						<div class="device-item" class:current={device.deviceId === currentDeviceId}>
+							<div class="device-info">
+								<svg
+									xmlns="http://www.w3.org/2000/svg"
+									width="20"
+									height="20"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+									stroke-linecap="round"
+									stroke-linejoin="round"
+								>
+									{#if device.deviceName?.includes('Android') || device.deviceName?.includes('iOS')}
+										<rect width="14" height="20" x="5" y="2" rx="2" ry="2" />
+										<path d="M12 18h.01" />
+									{:else}
+										<rect width="20" height="14" x="2" y="3" rx="2" />
+										<line x1="8" x2="16" y1="21" y2="21" />
+										<line x1="12" x2="12" y1="17" y2="21" />
+									{/if}
+								</svg>
+								<div>
+									<span class="device-name">
+										{device.deviceId === currentDeviceId ? 'This device' : device.deviceName}
+									</span>
+									{#if device.deviceId === currentDeviceId}
+										<span class="device-detail">{device.deviceName}</span>
+									{/if}
+								</div>
+							</div>
+							<button
+								type="button"
+								class="icon-btn danger"
+								title="Remove"
+								aria-label="Remove device"
+								disabled={devicesLoading}
+								onclick={() => device.deviceId && removeDevice(device.deviceId)}
+							>
+								<svg
+									xmlns="http://www.w3.org/2000/svg"
+									width="18"
+									height="18"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+									stroke-linecap="round"
+									stroke-linejoin="round"
+								>
+									<path d="M18 6 6 18" /><path d="m6 6 12 12" />
+								</svg>
+							</button>
+						</div>
+					{/each}
 				</div>
+
+				{#if devices.length > 1}
+					<button
+						type="button"
+						class="danger small"
+						onclick={removeAllDevices}
+						disabled={devicesLoading}
+					>
+						Remove All Devices
+					</button>
+				{/if}
+			{/if}
+
+			{#if !isCurrentDeviceRegistered}
 				<button
 					type="button"
-					class="toggle-btn"
-					class:active={notificationsEnabled}
 					disabled={notificationsLoading}
-					onclick={toggleNotifications}
-					aria-label={notificationsEnabled ? 'Disable notifications' : 'Enable notifications'}
+					onclick={addCurrentDevice}
+					style={hasAnyDevice ? 'margin-top: 0.75rem' : ''}
 				>
-					<span class="toggle-track">
-						<span class="toggle-thumb"></span>
-					</span>
+					{notificationsLoading ? 'Setting up...' : hasAnyDevice ? 'Add This Device' : 'Set Up Push Notifications'}
 				</button>
-			</div>
-			{#if notificationsEnabled}
+			{/if}
+
+			{#if hasAnyDevice}
 				<div class="notification-prefs">
 					<div class="notification-toggle sub">
 						<div class="toggle-info">
@@ -1305,6 +1439,51 @@
 		}
 	}
 
+	.device-list {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+		margin-bottom: 0.75rem;
+	}
+
+	.device-item {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		padding: 0.75rem;
+		background-color: rgba(255, 255, 255, 0.03);
+		border-radius: 6px;
+		border: 1px solid #555555;
+
+		&.current {
+			border-color: #02cfb7;
+			background-color: rgba(2, 207, 183, 0.05);
+		}
+	}
+
+	.device-info {
+		display: flex;
+		align-items: center;
+		gap: 0.75rem;
+		color: #dddddd;
+
+		svg {
+			flex-shrink: 0;
+			color: #999999;
+		}
+	}
+
+	.device-name {
+		font-size: 0.95rem;
+		color: #eeeeee;
+		display: block;
+	}
+
+	.device-detail {
+		font-size: 0.8rem;
+		color: #888888;
+	}
+
 	.notification-toggle {
 		display: flex;
 		justify-content: space-between;
@@ -1322,7 +1501,7 @@
 	}
 
 	.notification-prefs {
-		margin-top: 0.5rem;
+		margin-top: 0.75rem;
 		padding: 0 0.75rem;
 		border-left: 2px solid #555555;
 		margin-left: 0.75rem;

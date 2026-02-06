@@ -61,17 +61,46 @@ export const load = async ({ request, cookies, platform, url }) => {
 	// Re-check if there's still history to import (in case auto-import didn't happen)
 	const hasAnonHistory = !shouldAutoImport && !!anonUuid;
 
-	// Check if user has push notifications enabled and get preferences
-	const pushSub = await db.query.pushSubscription.findFirst({
-		where: eq(pushSubscription.userId, session.user.id),
-	});
+	// Get all push notification subscriptions (devices) for this user
+	const pushSubs = await db
+		.select({
+			id: pushSubscription.id,
+			endpoint: pushSubscription.endpoint,
+			deviceId: pushSubscription.deviceId,
+			deviceName: pushSubscription.deviceName,
+			notifyDailyReminder: pushSubscription.notifyDailyReminder,
+			notifyFriendActivity: pushSubscription.notifyFriendActivity,
+			notifyWeeklyRecap: pushSubscription.notifyWeeklyRecap,
+			createdAt: pushSubscription.createdAt,
+		})
+		.from(pushSubscription)
+		.where(eq(pushSubscription.userId, session.user.id));
 
-	const hasNotifications = !!pushSub;
-	const notificationPrefs = pushSub
+	// Backfill deviceId for legacy subscriptions (one-time lazy migration)
+	for (const sub of pushSubs) {
+		if (!sub.deviceId) {
+			const hash = await crypto.subtle.digest(
+				'SHA-256',
+				new TextEncoder().encode(sub.endpoint),
+			);
+			const computedId = Array.from(new Uint8Array(hash).slice(0, 8))
+				.map((b) => b.toString(16).padStart(2, '0'))
+				.join('');
+			sub.deviceId = computedId;
+			await db
+				.update(pushSubscription)
+				.set({ deviceId: computedId })
+				.where(eq(pushSubscription.id, sub.id));
+		}
+	}
+
+	const hasNotifications = pushSubs.length > 0;
+	const firstSub = pushSubs[0];
+	const notificationPrefs = firstSub
 		? {
-				dailyReminder: !!pushSub.notifyDailyReminder,
-				friendActivity: !!pushSub.notifyFriendActivity,
-				weeklyRecap: !!pushSub.notifyWeeklyRecap,
+				dailyReminder: !!firstSub.notifyDailyReminder,
+				friendActivity: !!firstSub.notifyFriendActivity,
+				weeklyRecap: !!firstSub.notifyWeeklyRecap,
 			}
 		: { dailyReminder: true, friendActivity: true, weeklyRecap: true };
 
@@ -82,6 +111,11 @@ export const load = async ({ request, cookies, platform, url }) => {
 		autoImportCount,
 		hasNotifications,
 		notificationPrefs,
+		pushDevices: pushSubs.map((s) => ({
+			deviceId: s.deviceId,
+			deviceName: s.deviceName || 'Unknown Device',
+			createdAt: s.createdAt,
+		})),
 		vapidPublicKey: platform.env.VAPID_PUBLIC_KEY,
 	};
 };

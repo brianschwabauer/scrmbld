@@ -22,8 +22,8 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 		});
 	}
 
-	// Parse request body
-	let body: { endpoint: string };
+	// Parse request body — accepts either deviceId or endpoint for backwards compat
+	let body: { deviceId?: string; endpoint?: string };
 
 	try {
 		body = await request.json();
@@ -34,8 +34,8 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 		});
 	}
 
-	if (!body.endpoint) {
-		return new Response(JSON.stringify({ error: 'Missing endpoint' }), {
+	if (!body.deviceId && !body.endpoint) {
+		return new Response(JSON.stringify({ error: 'Missing deviceId or endpoint' }), {
 			status: 400,
 			headers: { 'Content-Type': 'application/json' },
 		});
@@ -43,22 +43,35 @@ export const POST: RequestHandler = async ({ request, platform }) => {
 
 	const db = createDb(platform.env.D1);
 
-	// Delete subscription
-	await db
-		.delete(pushSubscription)
-		.where(
-			and(
+	// Look up the subscription to get the endpoint (needed for DO sync)
+	let sub;
+	if (body.deviceId) {
+		sub = await db.query.pushSubscription.findFirst({
+			where: and(
 				eq(pushSubscription.userId, session.user.id),
-				eq(pushSubscription.endpoint, body.endpoint),
+				eq(pushSubscription.deviceId, body.deviceId),
 			),
-		);
+		});
+	} else {
+		sub = await db.query.pushSubscription.findFirst({
+			where: and(
+				eq(pushSubscription.userId, session.user.id),
+				eq(pushSubscription.endpoint, body.endpoint!),
+			),
+		});
+	}
 
-	// Notify the Durable Object notification worker via service binding
-	if (platform.env.NOTIFICATIONS) {
-		try {
-			await platform.env.NOTIFICATIONS.unsubscribe(session.user.id);
-		} catch (error) {
-			console.error('Failed to notify DO worker:', error);
+	if (sub) {
+		// Delete from D1
+		await db.delete(pushSubscription).where(eq(pushSubscription.id, sub.id));
+
+		// Remove specific device from DO (pass endpoint so only this device is removed)
+		if (platform.env.NOTIFICATIONS) {
+			try {
+				await platform.env.NOTIFICATIONS.unsubscribe(session.user.id, sub.endpoint);
+			} catch (error) {
+				console.error('Failed to notify DO worker:', error);
+			}
 		}
 	}
 

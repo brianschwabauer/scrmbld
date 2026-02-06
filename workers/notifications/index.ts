@@ -23,6 +23,8 @@ export interface SubscribeData {
 	p256dh: string;
 	auth: string;
 	timezone?: string;
+	deviceName?: string;
+	deviceId?: string;
 }
 
 // WorkerEntrypoint for service binding RPC calls
@@ -38,10 +40,10 @@ export default class NotificationsService extends WorkerEntrypoint<Env> {
 		return stub.subscribe(data);
 	}
 
-	/** Unsubscribe a user from push notifications */
-	async unsubscribe(userId: string): Promise<{ success: boolean }> {
+	/** Unsubscribe a user from push notifications (specific device or all) */
+	async unsubscribe(userId: string, endpoint?: string): Promise<{ success: boolean }> {
 		const stub = this.getStub();
-		return stub.unsubscribe(userId);
+		return stub.unsubscribe(userId, endpoint);
 	}
 
 	/** Mark that a user has played today (skip daily reminder) */
@@ -92,26 +94,72 @@ export class NotificationScheduler extends DurableObject<Env> {
 	}
 
 	private initDatabase() {
-		this.sql.exec(`
-			CREATE TABLE IF NOT EXISTS subscriptions (
-				user_id TEXT PRIMARY KEY,
-				endpoint TEXT NOT NULL,
-				p256dh TEXT NOT NULL,
-				auth TEXT NOT NULL,
-				timezone TEXT DEFAULT 'UTC',
-				preferred_hour INTEGER DEFAULT 18,
-				created_at INTEGER NOT NULL,
-				updated_at INTEGER NOT NULL
-			);
+		// Check if we need to migrate from single-device to multi-device schema.
+		// Old schema: user_id is the sole PRIMARY KEY.
+		// New schema: PRIMARY KEY(user_id, endpoint) for multi-device support.
+		const tableInfo = this.sql.exec("PRAGMA table_info('subscriptions')").toArray() as Array<{
+			name: string;
+			pk: number;
+		}>;
 
+		const endpointCol = tableInfo.find((c) => c.name === 'endpoint');
+		const needsMigration = tableInfo.length > 0 && (!endpointCol || endpointCol.pk === 0);
+
+		if (needsMigration) {
+			this.sql.exec(`
+				CREATE TABLE subscriptions_new (
+					user_id TEXT NOT NULL,
+					endpoint TEXT NOT NULL,
+					p256dh TEXT NOT NULL,
+					auth TEXT NOT NULL,
+					timezone TEXT DEFAULT 'UTC',
+					preferred_hour INTEGER DEFAULT 18,
+					device_name TEXT,
+					device_id TEXT,
+					created_at INTEGER NOT NULL,
+					updated_at INTEGER NOT NULL,
+					PRIMARY KEY (user_id, endpoint)
+				);
+
+				INSERT INTO subscriptions_new
+					(user_id, endpoint, p256dh, auth, timezone, preferred_hour, device_name, device_id, created_at, updated_at)
+				SELECT user_id, endpoint, p256dh, auth, timezone, preferred_hour, NULL, NULL, created_at, updated_at
+				FROM subscriptions;
+
+				DROP TABLE subscriptions;
+				ALTER TABLE subscriptions_new RENAME TO subscriptions;
+
+				CREATE INDEX IF NOT EXISTS idx_subs_timezone ON subscriptions(timezone);
+				CREATE INDEX IF NOT EXISTS idx_subs_hour ON subscriptions(preferred_hour);
+			`);
+			console.log('Migrated subscriptions table to multi-device schema');
+		} else if (tableInfo.length === 0) {
+			this.sql.exec(`
+				CREATE TABLE IF NOT EXISTS subscriptions (
+					user_id TEXT NOT NULL,
+					endpoint TEXT NOT NULL,
+					p256dh TEXT NOT NULL,
+					auth TEXT NOT NULL,
+					timezone TEXT DEFAULT 'UTC',
+					preferred_hour INTEGER DEFAULT 18,
+					device_name TEXT,
+					device_id TEXT,
+					created_at INTEGER NOT NULL,
+					updated_at INTEGER NOT NULL,
+					PRIMARY KEY (user_id, endpoint)
+				);
+
+				CREATE INDEX IF NOT EXISTS idx_subs_timezone ON subscriptions(timezone);
+				CREATE INDEX IF NOT EXISTS idx_subs_hour ON subscriptions(preferred_hour);
+			`);
+		}
+
+		this.sql.exec(`
 			CREATE TABLE IF NOT EXISTS sent_today (
 				user_id TEXT PRIMARY KEY,
 				day INTEGER NOT NULL,
 				sent_at INTEGER NOT NULL
 			);
-
-			CREATE INDEX IF NOT EXISTS idx_subs_timezone ON subscriptions(timezone);
-			CREATE INDEX IF NOT EXISTS idx_subs_hour ON subscriptions(preferred_hour);
 
 			CREATE TABLE IF NOT EXISTS sent_weekly (
 				timezone TEXT NOT NULL,
@@ -154,14 +202,15 @@ export class NotificationScheduler extends DurableObject<Env> {
 		const preferredHour = 18; // Default preferred hour
 
 		this.sql.exec(
-			`INSERT INTO subscriptions (user_id, endpoint, p256dh, auth, timezone, preferred_hour, created_at, updated_at)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-			 ON CONFLICT(user_id) DO UPDATE SET
-				endpoint = excluded.endpoint,
+			`INSERT INTO subscriptions (user_id, endpoint, p256dh, auth, timezone, preferred_hour, device_name, device_id, created_at, updated_at)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			 ON CONFLICT(user_id, endpoint) DO UPDATE SET
 				p256dh = excluded.p256dh,
 				auth = excluded.auth,
 				timezone = excluded.timezone,
 				preferred_hour = excluded.preferred_hour,
+				device_name = excluded.device_name,
+				device_id = excluded.device_id,
 				updated_at = excluded.updated_at`,
 			data.userId,
 			data.endpoint,
@@ -169,6 +218,8 @@ export class NotificationScheduler extends DurableObject<Env> {
 			data.auth,
 			timezone,
 			preferredHour,
+			data.deviceName || null,
+			data.deviceId || null,
 			now,
 			now,
 		);
@@ -182,14 +233,24 @@ export class NotificationScheduler extends DurableObject<Env> {
 		return { success: true };
 	}
 
-	/** Unsubscribe a user from push notifications */
-	async unsubscribe(userId: string): Promise<{ success: boolean }> {
+	/** Unsubscribe a user from push notifications (specific device or all) */
+	async unsubscribe(userId: string, endpoint?: string): Promise<{ success: boolean }> {
 		if (!userId) {
 			throw new Error('Missing userId');
 		}
 
-		this.sql.exec('DELETE FROM subscriptions WHERE user_id = ?', userId);
-		this.sql.exec('DELETE FROM sent_today WHERE user_id = ?', userId);
+		if (endpoint) {
+			// Remove specific device
+			this.sql.exec(
+				'DELETE FROM subscriptions WHERE user_id = ? AND endpoint = ?',
+				userId,
+				endpoint,
+			);
+		} else {
+			// Remove all devices for user
+			this.sql.exec('DELETE FROM subscriptions WHERE user_id = ?', userId);
+			this.sql.exec('DELETE FROM sent_today WHERE user_id = ?', userId);
+		}
 
 		return { success: true };
 	}
@@ -264,11 +325,9 @@ export class NotificationScheduler extends DurableObject<Env> {
 		// Clean up old sent_today entries (older than today)
 		this.sql.exec('DELETE FROM sent_today WHERE day < ?', today);
 
-		// Find users who:
-		// 1. Have a subscription
-		// 2. It's their preferred notification hour in their timezone
-		// 3. Haven't been marked as "played" or "sent" today
-		const usersToNotify = this.sql
+		// Find all device subscriptions for users who haven't been sent/played today.
+		// With multi-device, this returns multiple rows per user.
+		const devicesToNotify = this.sql
 			.exec(
 				`
 			SELECT s.user_id, s.endpoint, s.p256dh, s.auth, s.timezone, s.preferred_hour
@@ -287,56 +346,74 @@ export class NotificationScheduler extends DurableObject<Env> {
 			preferred_hour: number;
 		}>;
 
-		console.log(`Checking ${usersToNotify.length} users for notifications`);
-
-		// Filter by preferred hour first
-		const eligibleUsers = usersToNotify.filter(
-			(user) => this.getHourInTimezone(now, user.timezone) === user.preferred_hour,
+		// Filter by preferred hour in their timezone
+		const eligibleDevices = devicesToNotify.filter(
+			(device) => this.getHourInTimezone(now, device.timezone) === device.preferred_hour,
 		);
 
+		// Group by user_id for multi-device sending
+		const userDevices = new Map<string, typeof eligibleDevices>();
+		for (const device of eligibleDevices) {
+			if (!userDevices.has(device.user_id)) userDevices.set(device.user_id, []);
+			userDevices.get(device.user_id)!.push(device);
+		}
+
 		// Check D1 preferences — filter out users who disabled daily reminders
-		let dailyReminderUsers = eligibleUsers;
-		if (eligibleUsers.length > 0) {
-			const userIds = eligibleUsers.map((u) => u.user_id);
+		const userIds = [...userDevices.keys()];
+		const dailyReminderDisabled = new Set<string>();
+		if (userIds.length > 0) {
 			const placeholders = userIds.map(() => '?').join(',');
 			const prefResult = await this.env.D1.prepare(
-				`SELECT user_id FROM push_subscription
+				`SELECT DISTINCT user_id FROM push_subscription
 				 WHERE user_id IN (${placeholders}) AND notify_daily_reminder = 0`,
 			)
 				.bind(...userIds)
 				.all<{ user_id: string }>();
 
-			const disabledUserIds = new Set((prefResult.results || []).map((r) => r.user_id));
-			dailyReminderUsers = eligibleUsers.filter((u) => !disabledUserIds.has(u.user_id));
-		}
-
-		let sent = 0;
-		const skipped = usersToNotify.length - dailyReminderUsers.length;
-		let failed = 0;
-
-		for (const user of dailyReminderUsers) {
-			// Send notification
-			try {
-				const success = await this.sendPushNotification(user);
-				if (success) {
-					// Mark as sent
-					this.sql.exec(
-						'INSERT INTO sent_today (user_id, day, sent_at) VALUES (?, ?, ?)',
-						user.user_id,
-						today,
-						Date.now(),
-					);
-					sent++;
-				} else {
-					failed++;
-				}
-			} catch (error) {
-				console.error(`Failed to send notification to ${user.user_id}:`, error);
-				failed++;
+			for (const r of prefResult.results || []) {
+				dailyReminderDisabled.add(r.user_id);
 			}
 		}
 
-		console.log(`Notifications: sent=${sent}, skipped=${skipped}, failed=${failed}`);
+		let sentUsers = 0;
+		let sentDevices = 0;
+		let failed = 0;
+
+		for (const [userId, devices] of userDevices) {
+			if (dailyReminderDisabled.has(userId)) continue;
+
+			// Send to ALL devices for this user
+			let anySuccess = false;
+			for (const device of devices) {
+				try {
+					const success = await this.sendPushNotification(device);
+					if (success) {
+						anySuccess = true;
+						sentDevices++;
+					} else {
+						failed++;
+					}
+				} catch (error) {
+					console.error(`Failed to send notification to ${userId}:`, error);
+					failed++;
+				}
+			}
+
+			if (anySuccess) {
+				// Mark user as sent (once per user, not per device)
+				this.sql.exec(
+					'INSERT OR IGNORE INTO sent_today (user_id, day, sent_at) VALUES (?, ?, ?)',
+					userId,
+					today,
+					Date.now(),
+				);
+				sentUsers++;
+			}
+		}
+
+		console.log(
+			`Daily notifications: users=${sentUsers}, devices=${sentDevices}, failed=${failed}`,
+		);
 
 		// Check weekly leaderboards (Monday 8AM per timezone)
 		await this.checkWeeklyLeaderboards(now);
@@ -446,7 +523,7 @@ export class NotificationScheduler extends DurableObject<Env> {
 		const lastMonday = thisMondayUtc - 7 * msPerDay;
 		const lastSunday = thisMondayUtc; // exclusive upper bound
 
-		// Get all subscribed users in this timezone
+		// Get all subscribed users in this timezone (may have multiple devices per user)
 		const subscribers = this.sql
 			.exec(
 				'SELECT user_id, endpoint, p256dh, auth FROM subscriptions WHERE timezone = ?',
@@ -461,8 +538,14 @@ export class NotificationScheduler extends DurableObject<Env> {
 
 		if (subscribers.length === 0) return;
 
-		const subscriberIds = subscribers.map((s) => s.user_id);
-		const subscriberMap = new Map(subscribers.map((s) => [s.user_id, s]));
+		// Deduplicate user IDs (a user may have multiple devices)
+		const subscriberIds = [...new Set(subscribers.map((s) => s.user_id))];
+		// Map userId → all their device subscriptions
+		const subscriberDevicesMap = new Map<string, typeof subscribers>();
+		for (const s of subscribers) {
+			if (!subscriberDevicesMap.has(s.user_id)) subscriberDevicesMap.set(s.user_id, []);
+			subscriberDevicesMap.get(s.user_id)!.push(s);
+		}
 
 		// Check D1 preferences — find users who disabled weekly recap notifications
 		const weeklyRecapDisabledUsers = new Set<string>();
@@ -598,7 +681,7 @@ export class NotificationScheduler extends DurableObject<Env> {
 				}
 			}
 
-			// Send weekly winner notification (only if user hasn't disabled weekly recap)
+			// Send weekly winner notification to ALL devices (if user hasn't disabled weekly recap)
 			if (!weeklyRecapDisabledUsers.has(userId)) {
 				let body: string;
 				if (isLeaderboardKing && isSpeedKing) {
@@ -609,17 +692,19 @@ export class NotificationScheduler extends DurableObject<Env> {
 					body = 'You had the fastest solve among friends last week!';
 				}
 
-				const sub = subscriberMap.get(userId)!;
-				try {
-					const success = await this.sendPushNotification(sub, {
-						title: 'Weekly Recap \u{1F3C6}',
-						body,
-						url: '/friends',
-						type: 'weekly_leaderboard',
-					});
-					if (success) notificationsSent++;
-				} catch (error) {
-					console.error(`Failed to send weekly notification to ${userId}:`, error);
+				const userDevices = subscriberDevicesMap.get(userId) || [];
+				for (const sub of userDevices) {
+					try {
+						const success = await this.sendPushNotification(sub, {
+							title: 'Weekly Recap \u{1F3C6}',
+							body,
+							url: '/friends',
+							type: 'weekly_leaderboard',
+						});
+						if (success) notificationsSent++;
+					} catch (error) {
+						console.error(`Failed to send weekly notification to ${userId}:`, error);
+					}
 				}
 			}
 		}

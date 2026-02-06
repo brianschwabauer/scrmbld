@@ -106,5 +106,7 @@ export const pushSubscription = sqliteTable('push_subscription', {
 	notifyDailyReminder: integer('notify_daily_reminder').notNull().default(1),
 	notifyFriendActivity: integer('notify_friend_activity').notNull().default(1),
 	notifyWeeklyRecap: integer('notify_weekly_recap').notNull().default(1),
+	deviceName: text('device_name'),
+	deviceId: text('device_id'),
 	createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
 });

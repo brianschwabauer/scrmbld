@@ -9,8 +9,10 @@ interface NotificationsService {
 		p256dh: string;
 		auth: string;
 		timezone?: string;
+		deviceName?: string;
+		deviceId?: string;
 	}): Promise<{ success: boolean }>;
-	unsubscribe(userId: string): Promise<{ success: boolean }>;
+	unsubscribe(userId: string, endpoint?: string): Promise<{ success: boolean }>;
 	played(userId: string, day: number): Promise<{ success: boolean }>;
 	status(): Promise<{
 		subscriptions: number;
