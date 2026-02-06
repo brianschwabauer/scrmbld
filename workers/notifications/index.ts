@@ -73,10 +73,9 @@ export default class NotificationsService extends WorkerEntrypoint<Env> {
 		return stub.initAlarm();
 	}
 
-	/** Handle HTTP fetch requests (backwards compatibility) */
-	async fetch(request: Request): Promise<Response> {
-		const stub = this.getStub();
-		return stub.fetch(request);
+	/** Minimal fetch handler required for deployment — all access is via RPC */
+	async fetch(): Promise<Response> {
+		return new Response(null, { status: 404 });
 	}
 }
 
@@ -121,45 +120,6 @@ export class NotificationScheduler extends DurableObject<Env> {
 				PRIMARY KEY(timezone, week_key)
 			);
 		`);
-	}
-
-	async fetch(request: Request): Promise<Response> {
-		const url = new URL(request.url);
-		const path = url.pathname;
-
-		try {
-			// API Routes
-			if (request.method === 'POST' && path === '/subscribe') {
-				return this.handleSubscribe(request);
-			}
-			if (request.method === 'POST' && path === '/unsubscribe') {
-				return this.handleUnsubscribe(request);
-			}
-			if (request.method === 'POST' && path === '/played') {
-				return this.handlePlayed(request);
-			}
-			if (request.method === 'GET' && path === '/status') {
-				return this.handleStatus();
-			}
-			if (request.method === 'POST' && path === '/trigger') {
-				// Manual trigger for testing
-				await this.sendScheduledNotifications();
-				return Response.json({ success: true, message: 'Notifications triggered' });
-			}
-			if (request.method === 'POST' && path === '/init-alarm') {
-				// Initialize the hourly alarm
-				await this.scheduleNextAlarm();
-				return Response.json({ success: true, message: 'Alarm initialized' });
-			}
-
-			return Response.json({ error: 'Not found' }, { status: 404 });
-		} catch (error) {
-			console.error('Error handling request:', error);
-			return Response.json(
-				{ error: error instanceof Error ? error.message : 'Internal error' },
-				{ status: 500 },
-			);
-		}
 	}
 
 	// Called when alarm fires
@@ -293,48 +253,6 @@ export class NotificationScheduler extends DurableObject<Env> {
 	async initAlarm(): Promise<{ success: boolean; message: string }> {
 		await this.scheduleNextAlarm();
 		return { success: true, message: 'Alarm initialized' };
-	}
-
-	// ====================================
-	// HTTP Handlers (backwards compatible)
-	// ====================================
-
-	private async handleSubscribe(request: Request): Promise<Response> {
-		const body = (await request.json()) as SubscribeData & { preferredHour?: number };
-		try {
-			const result = await this.subscribe(body);
-			return Response.json(result);
-		} catch (e) {
-			return Response.json({ error: e instanceof Error ? e.message : 'Error' }, { status: 400 });
-		}
-	}
-
-	private async handleUnsubscribe(request: Request): Promise<Response> {
-		const body = (await request.json()) as { userId: string };
-		try {
-			const result = await this.unsubscribe(body.userId);
-			return Response.json(result);
-		} catch (e) {
-			return Response.json({ error: e instanceof Error ? e.message : 'Error' }, { status: 400 });
-		}
-	}
-
-	private async handlePlayed(request: Request): Promise<Response> {
-		const body = (await request.json()) as { userId: string; day: number };
-		try {
-			const result = await this.played(body.userId, body.day);
-			return Response.json(result);
-		} catch (e) {
-			return Response.json({ error: e instanceof Error ? e.message : 'Error' }, { status: 400 });
-		}
-	}
-
-	private async handleStatus(): Promise<Response> {
-		const result = await this.status();
-		return Response.json({
-			...result,
-			nextAlarm: result.nextAlarm ? new Date(result.nextAlarm).toISOString() : null,
-		});
 	}
 
 	private async sendScheduledNotifications(): Promise<void> {
