@@ -4,6 +4,16 @@
 	"main": "index.ts",
 	"compatibility_date": "2026-01-26",
 	"compatibility_flags": ["nodejs_als"],
+	"observability": {
+		"enabled": true,
+		"logs": {
+			"enabled": true,
+			"invocation_logs": true,
+		},
+		"traces": {
+			"enabled": true,
+		},
+	},
 	"durable_objects": {
 		"bindings": [
 			{
