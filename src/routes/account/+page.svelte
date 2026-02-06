@@ -485,17 +485,6 @@
 						</div>
 					{/each}
 				</div>
-
-				{#if devices.length > 1}
-					<button
-						type="button"
-						class="danger small"
-						onclick={removeAllDevices}
-						disabled={devicesLoading}
-					>
-						Remove All Devices
-					</button>
-				{/if}
 			{/if}
 
 			{#if !isCurrentDeviceRegistered}
@@ -505,7 +494,11 @@
 					onclick={addCurrentDevice}
 					style={hasAnyDevice ? 'margin-top: 0.75rem' : ''}
 				>
-					{notificationsLoading ? 'Setting up...' : hasAnyDevice ? 'Add This Device' : 'Set Up Push Notifications'}
+					{notificationsLoading
+						? 'Setting up...'
+						: hasAnyDevice
+							? 'Add This Device'
+							: 'Set Up Push Notifications'}
 				</button>
 			{/if}
 
@@ -582,6 +575,17 @@
 			{/if}
 		{:else}
 			<p class="hint">Push notifications are not supported in your browser.</p>
+		{/if}
+
+		{#if hasAnyDevice && devices.length > 1}
+			<button
+				type="button"
+				class="danger small"
+				onclick={removeAllDevices}
+				disabled={devicesLoading}
+			>
+				Remove All Devices
+			</button>
 		{/if}
 	</section>
 
