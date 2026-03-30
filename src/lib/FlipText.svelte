@@ -42,8 +42,10 @@
 		],
 		/** The callback for when one of the flip text characters is clicked */
 		onclick = undefined as ((index: number) => void) | undefined,
+	/** Max number of flap element pairs per letter. Lower = fewer DOM nodes = better performance.
+	 * Only 2–3 are ever visible at once; 10 is generous for the game, 3–4 suffices for dense displays. */
+	maxFlaps = 10,
 	} = $props();
-	const MAX_LETTER_ELEMENTS = 10; // max number of letter elements to display. lower this to improve performance
 	const DURATION = $derived(duration);
 	const STAGGER = $derived(stagger ?? Math.floor(duration * 0.2)); // number of ms between each letter animation
 	const SPRING_DURATION = 1000;
@@ -132,8 +134,8 @@
 			}
 
 			const nextAlphabetIndex = (state.alphabetIndex + 1) % alphabet.length;
-			const staticFlapIndex = (state.flapIndex - 1 + MAX_LETTER_ELEMENTS) % MAX_LETTER_ELEMENTS;
-			const motionFlapIndex = (state.flapIndex + MAX_LETTER_ELEMENTS) % MAX_LETTER_ELEMENTS;
+			const staticFlapIndex = (state.flapIndex - 1 + maxFlaps) % maxFlaps;
+			const motionFlapIndex = (state.flapIndex + maxFlaps) % maxFlaps;
 			const allFlapsEls = Array.from(letterEl.children) as HTMLElement[];
 			const motionTopFlapEl = allFlapsEls[motionFlapIndex * 2];
 			const staticTopFlapEl = allFlapsEls[staticFlapIndex * 2];
@@ -154,11 +156,11 @@
 				if (i % 2 === 0) {
 					// Top flap
 					const flapIndex = Math.floor(i / 2);
-					el.style.zIndex = `${(flapIndex - staticFlapIndex + MAX_LETTER_ELEMENTS) % MAX_LETTER_ELEMENTS}`;
+					el.style.zIndex = `${(flapIndex - staticFlapIndex + maxFlaps) % maxFlaps}`;
 				} else {
 					// Bottom flap
 					const flapIndex = Math.floor(i / 2) + 1;
-					el.style.zIndex = `${(motionFlapIndex - flapIndex + MAX_LETTER_ELEMENTS) % MAX_LETTER_ELEMENTS}`;
+					el.style.zIndex = `${(motionFlapIndex - flapIndex + maxFlaps) % maxFlaps}`;
 				}
 			});
 
@@ -234,6 +236,10 @@
 		letters;
 		untrack(() => {
 			letters.forEach((letter, i) => {
+				// Skip letters already displaying the target — avoids spinning up
+				// an async animation loop that would immediately break on the first check.
+				const state = lettersState.get(i);
+				if (state && alphabet[state.alphabetIndex] === letter) return;
 				animateLetterToTarget(i);
 			});
 		});
@@ -258,7 +264,7 @@
 				? i >= selectionStart && i < selectionEnd
 				: i >= selectionStart && i <= selectionEnd}
 		>
-			{#each new Array(MAX_LETTER_ELEMENTS) as _, j (j)}
+			{#each new Array(maxFlaps) as _, j (j)}
 				<div class="part top"></div>
 				<div class="part bottom"></div>
 			{/each}

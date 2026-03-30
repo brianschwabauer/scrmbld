@@ -104,7 +104,11 @@
 					pos += cols;
 				}
 			}
-			if (pos >= para.length && para.length > 0 && lines[lines.length - 1] !== para.slice(pos - (para.length - pos))) {
+			if (
+				pos >= para.length &&
+				para.length > 0 &&
+				lines[lines.length - 1] !== para.slice(pos - (para.length - pos))
+			) {
 				// Handled in the loop above
 			}
 		}
@@ -237,7 +241,15 @@
 <div class="display" style:--cols={cols} style:--rows={rows}>
 	{#key `${alphabetKey}|${duration}|${stagger ?? ''}`}
 		{#each displayLines as line, i (i)}
-			<FlipText word={line} minLength={cols} {duration} {stagger} sound={!muted} {alphabet} />
+			<FlipText
+				word={line}
+				minLength={cols}
+				{duration}
+				{stagger}
+				sound={!muted}
+				{alphabet}
+				maxFlaps={4}
+			/>
 		{/each}
 	{/key}
 </div>
@@ -392,7 +404,7 @@
 		contain: layout style;
 
 		// Remove compositor layer promotion from individual flap elements on this page.
-		// FlipText creates 20 .part elements per letter, each with will-change which creates
+		// FlipText creates .part elements per letter (2 × maxFlaps), each with will-change which creates
 		// a separate compositor layer. During resize, the browser must resize every layer.
 		// Removing will-change lets the browser promote on-demand during animations instead.
 		:global(.flip-text .letters .part) {
