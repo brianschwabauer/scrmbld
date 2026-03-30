@@ -83,27 +83,30 @@
 				lines.push('');
 				continue;
 			}
-			const words = para.split(' ');
-			let line = '';
-			for (const word of words) {
-				if (word.length > cols) {
-					if (line) {
-						lines.push(line);
-						line = '';
-					}
-					for (let i = 0; i < word.length; i += cols) lines.push(word.slice(i, i + cols));
-					continue;
+			// Walk through the paragraph preserving all spaces.
+			// Break at the last space that fits when a line exceeds cols.
+			let pos = 0;
+			while (pos < para.length) {
+				if (pos + cols >= para.length) {
+					// Rest of paragraph fits on one line
+					lines.push(para.slice(pos));
+					break;
 				}
-				if (!line) {
-					line = word;
-				} else if (line.length + 1 + word.length <= cols) {
-					line += ' ' + word;
+				// Find the last space within the cols limit to break at
+				const chunk = para.slice(pos, pos + cols + 1);
+				const breakAt = chunk.lastIndexOf(' ', cols);
+				if (breakAt > 0) {
+					lines.push(para.slice(pos, pos + breakAt));
+					pos += breakAt + 1; // skip past the breaking space
 				} else {
-					lines.push(line);
-					line = word;
+					// No space found — hard break at cols
+					lines.push(para.slice(pos, pos + cols));
+					pos += cols;
 				}
 			}
-			lines.push(line);
+			if (pos >= para.length && para.length > 0 && lines[lines.length - 1] !== para.slice(pos - (para.length - pos))) {
+				// Handled in the loop above
+			}
 		}
 		return lines;
 	}
