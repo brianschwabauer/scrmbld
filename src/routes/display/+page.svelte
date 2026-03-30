@@ -10,7 +10,6 @@
 	const MAX_TEXT = 1000;
 	const MAX_COLS = 80;
 	const MAX_ROWS = 40;
-	const MAX_FONT = 150;
 
 	const params = $derived(page.url.searchParams);
 
@@ -185,26 +184,6 @@
 	// ── Mute ───────────────────────────────────────────
 	let muted = $state(browser ? document.cookie.includes('scrmbld_muted=true') : false);
 
-	// ── Font size calculation ──────────────────────────
-	let fontSize = $state(16);
-
-	function calcFontSize() {
-		const vw = window.innerWidth;
-		const vh = window.innerHeight;
-		const w = 1.5 * cols + 0.1 * Math.max(cols - 1, 0) + 0.24;
-		const h = rows * 2.24 + Math.max(rows - 1, 0) * 0.15;
-		fontSize = Math.min((vw - 32) / w, (vh - 32) / h, MAX_FONT);
-	}
-
-	$effect(() => {
-		if (!browser) return;
-		cols;
-		rows;
-		calcFontSize();
-		window.addEventListener('resize', calcFontSize);
-		return () => window.removeEventListener('resize', calcFontSize);
-	});
-
 	// ── Settings panel ─────────────────────────────────
 	let settingsOpen = $state(false);
 	let sText = $state('');
@@ -252,7 +231,7 @@
 	}}
 />
 
-<div class="display" style:font-size="{fontSize}px">
+<div class="display" style:--cols={cols} style:--rows={rows}>
 	{#key `${alphabetKey}|${duration}|${stagger ?? ''}`}
 		{#each displayLines as line, i (i)}
 			<FlipText word={line} minLength={cols} {duration} {stagger} sound={!muted} {alphabet} />
@@ -391,6 +370,13 @@
 
 <style lang="scss">
 	.display {
+		// Font-size scaled to fill the viewport based on grid dimensions.
+		// Each letter cell is 1.5em wide × 2em tall (FlipText .part: font-size 2em, width 0.75em, height 1em).
+		// Letter gap: ~0.1em, board padding: ~0.24em per row, row gap: 0.15em.
+		--tw: calc(1.6 * var(--cols) + 0.14);
+		--th: calc(2.39 * var(--rows) - 0.15);
+		font-size: min(calc((100vw - 2rem) / var(--tw)), calc((100dvh - 2rem) / var(--th)), 150px);
+
 		display: flex;
 		flex-direction: column;
 		align-items: center;
@@ -400,6 +386,15 @@
 		gap: 0.15em;
 		padding: 1rem;
 		box-sizing: border-box;
+		contain: layout style;
+
+		// Remove compositor layer promotion from individual flap elements on this page.
+		// FlipText creates 20 .part elements per letter, each with will-change which creates
+		// a separate compositor layer. During resize, the browser must resize every layer.
+		// Removing will-change lets the browser promote on-demand during animations instead.
+		:global(.flip-text .letters .part) {
+			will-change: auto !important;
+		}
 	}
 
 	.fab {
