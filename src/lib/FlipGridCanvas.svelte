@@ -146,8 +146,8 @@
 		const pfs = 2 * em;
 		cellW = 0.75 * pfs;
 		cellH = 1.0 * pfs;
-		cellGap = Math.max(2, 0.1 * em);
-		flapGap = Math.max(2, 0.045 * em);
+		cellGap = 0.1 * em;
+		flapGap = 0.045 * em;
 		boardPad = 0.12 * em;
 		boardR = 0.08 * em;
 		topClipY = cellH / 2 - flapGap / 2;
