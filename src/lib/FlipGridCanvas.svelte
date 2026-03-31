@@ -25,7 +25,7 @@
 		initialDelay = 0,
 	} = $props();
 
-	const PERSP = 80;
+	const PERSP = 150;
 	const SPRING_DUR = 1000;
 	const MAX_OVERLAPPING = 8;
 	let strips = 12;
