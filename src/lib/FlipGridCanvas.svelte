@@ -25,10 +25,10 @@
 		initialDelay = 0,
 	} = $props();
 
-	const STRIPS = 12;
 	const PERSP = 80;
 	const SPRING_DUR = 1000;
 	const MAX_OVERLAPPING = 8;
+	let strips = 12;
 	const DUR = $derived(duration);
 	const STAG = $derived(stagger ?? Math.floor(duration * 0.2));
 	const COLOR = '#dddddd';
@@ -36,48 +36,59 @@
 	// 0 = all letters flip in perfect unison, 1 = maximum random variation
 	const JITTER = 0.4;
 
-	// ── Spring easing ──────────────────────────────────────────────────────────
-	const SP: [number, number][] = [
-		[0, 0],
-		[0.0105, 0.009],
-		[0.021, 0.035],
-		[0.044, 0.141],
-		[0.067, 0.281],
-		[0.129, 0.723],
-		[0.167, 0.892],
-		[0.186, 1.03],
-		[0.205, 1.135],
-		[0.224, 1.212],
-		[0.243, 1.261],
-		[0.257, 1.278],
-		[0.271, 1.285],
-		[0.285, 1.282],
-		[0.299, 1.27],
-		[0.328, 1.226],
-		[0.396, 1.089],
-		[0.431, 1.03],
-		[0.471, 0.984],
-		[0.51, 0.96],
-		[0.538, 0.955],
-		[0.571, 0.956],
-		[0.698, 0.995],
-		[0.769, 1.005],
-		[0.838, 1.007],
-		[1, 1],
-	];
+	// ── Spring easing (pre-computed LUT) ───────────────────────────────────────
+	const SPRING_LUT_SIZE = 256;
+	const SPRING_LUT = (() => {
+		const SP: [number, number][] = [
+			[0, 0],
+			[0.0105, 0.009],
+			[0.021, 0.035],
+			[0.044, 0.141],
+			[0.067, 0.281],
+			[0.129, 0.723],
+			[0.167, 0.892],
+			[0.186, 1.03],
+			[0.205, 1.135],
+			[0.224, 1.212],
+			[0.243, 1.261],
+			[0.257, 1.278],
+			[0.271, 1.285],
+			[0.285, 1.282],
+			[0.299, 1.27],
+			[0.328, 1.226],
+			[0.396, 1.089],
+			[0.431, 1.03],
+			[0.471, 0.984],
+			[0.51, 0.96],
+			[0.538, 0.955],
+			[0.571, 0.956],
+			[0.698, 0.995],
+			[0.769, 1.005],
+			[0.838, 1.007],
+			[1, 1],
+		];
+		function lookup(t: number): number {
+			let lo = 0,
+				hi = SP.length - 1;
+			while (lo < hi - 1) {
+				const mid = (lo + hi) >> 1;
+				if (SP[mid][0] <= t) lo = mid;
+				else hi = mid;
+			}
+			const [t0, v0] = SP[lo];
+			const [t1, v1] = SP[hi];
+			return v0 + ((v1 - v0) * (t - t0)) / (t1 - t0);
+		}
+		const lut = new Float32Array(SPRING_LUT_SIZE + 1);
+		for (let i = 0; i <= SPRING_LUT_SIZE; i++) lut[i] = lookup(i / SPRING_LUT_SIZE);
+		return lut;
+	})();
 	function spring(t: number): number {
 		if (t <= 0) return 0;
 		if (t >= 1) return 1;
-		let lo = 0,
-			hi = SP.length - 1;
-		while (lo < hi - 1) {
-			const mid = (lo + hi) >> 1;
-			if (SP[mid][0] <= t) lo = mid;
-			else hi = mid;
-		}
-		const [t0, v0] = SP[lo];
-		const [t1, v1] = SP[hi];
-		return v0 + ((v1 - v0) * (t - t0)) / (t1 - t0);
+		const fi = t * SPRING_LUT_SIZE;
+		const i = fi | 0;
+		return SPRING_LUT[i] + (SPRING_LUT[i + 1] - SPRING_LUT[i]) * (fi - i);
 	}
 
 	// ── Targets (flat array, row-major) ────────────────────────────────────────
@@ -123,6 +134,10 @@
 	let contentCanvas: HTMLCanvasElement | undefined;
 	let contentCtx: CanvasRenderingContext2D | null = null;
 	let activeCells = new Set<number>();
+	let needsFullRedraw = true;
+	let settledThisFrame: number[] = [];
+	let prevSpriteKey = '';
+	let prevBoardKey = '';
 
 	function recomputeSizes() {
 		if (!wrapper || !canvasEl) return;
@@ -330,6 +345,7 @@
 		contentCanvas.height = ph;
 		contentCtx = contentCanvas.getContext('2d')!;
 		contentCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+		needsFullRedraw = true;
 
 		// Draw background
 		if (boardBgCanvas) {
@@ -385,8 +401,16 @@
 
 	function rebuildCaches() {
 		buildAlphaMap();
-		buildSpriteSheet();
-		buildBoardBg();
+		const spriteKey = `${cellW}|${cellH}|${dpr}|${alphabet.length}`;
+		if (spriteKey !== prevSpriteKey) {
+			prevSpriteKey = spriteKey;
+			buildSpriteSheet();
+		}
+		const boardKey = `${rowCount}|${cols}|${cellW}|${cellH}|${dpr}`;
+		if (boardKey !== prevBoardKey) {
+			prevBoardKey = boardKey;
+			buildBoardBg();
+		}
 		buildContentCanvas();
 	}
 
@@ -440,7 +464,7 @@
 		const fb = isTop ? topClipY : cellH;
 		const fh = fb - ft;
 		if (fh <= 0) return;
-		const sh = fh / STRIPS;
+		const sh = fh / strips;
 		const cosT = Math.cos(theta),
 			sinT = Math.sin(theta);
 		const dimAlpha = brightness < 1 ? 1 - brightness : 0;
@@ -455,7 +479,7 @@
 		}
 		c.clip();
 
-		for (let s = 0; s < STRIPS; s++) {
+		for (let s = 0; s < strips; s++) {
 			const sy0 = ft + s * sh;
 			const ly0 = sy0 - rotY,
 				ly1 = ly0 + sh;
@@ -497,26 +521,52 @@
 	function renderFrame(now: number) {
 		if (!ctx || !contentCanvas) return;
 		const c = ctx;
+		const nCols = cols;
 
-		// Stamp full content layer (background + static cell content)
-		c.drawImage(
-			contentCanvas,
-			0,
-			0,
-			contentCanvas.width,
-			contentCanvas.height,
-			0,
-			0,
-			totalW,
-			totalH,
-		);
+		if (needsFullRedraw) {
+			c.drawImage(
+				contentCanvas,
+				0,
+				0,
+				contentCanvas.width,
+				contentCanvas.height,
+				0,
+				0,
+				totalW,
+				totalH,
+			);
+			needsFullRedraw = false;
+		} else if (activeCells.size > 0 || settledThisFrame.length > 0) {
+			// Blit only the rows that contain active or just-settled cells
+			let minRow = rowCount,
+				maxRow = -1;
+			for (const idx of activeCells) {
+				const row = (idx / nCols) | 0;
+				if (row < minRow) minRow = row;
+				if (row > maxRow) maxRow = row;
+			}
+			for (let i = 0; i < settledThisFrame.length; i++) {
+				const row = (settledThisFrame[i] / nCols) | 0;
+				if (row < minRow) minRow = row;
+				if (row > maxRow) maxRow = row;
+			}
+			if (minRow <= maxRow) {
+				const y0 = minRow * (rowH + rowGap);
+				const y1 = maxRow * (rowH + rowGap) + rowH;
+				const sy = Math.round(y0 * dpr);
+				const sh = Math.ceil((y1 - y0) * dpr);
+				c.drawImage(contentCanvas, 0, sy, contentCanvas.width, sh, 0, y0, totalW, y1 - y0);
+			}
+		}
+		settledThisFrame.length = 0;
 
 		if (activeCells.size === 0) return;
 
+		strips = activeCells.size > 200 ? 6 : activeCells.size > 50 ? 8 : 12;
+
 		// Overdraw only active cells
-		const nCols = cols;
 		for (const idx of activeCells) {
-			const row = Math.floor(idx / nCols);
+			const row = (idx / nCols) | 0;
 			const col = idx % nCols;
 			const ry = row * (rowH + rowGap);
 			const cx = boardPad + col * (cellW + cellGap);
@@ -593,20 +643,32 @@
 		oldLetter: string;
 		newLetter: string;
 	}
-	let alphaIdx: number[] = [];
-	let nextStepAt: number[] = [];
+	let alphaIdx = new Int32Array(0);
+	let nextStepAt = new Float64Array(0);
 	let cellAnims: StepAnim[][] = [];
-	let cellStartDelay: number[] = [];
-	let cellSpeedMult: number[] = [];
+	let cellStartDelay = new Float64Array(0);
+	let cellSpeedMult = new Float64Array(0);
 
 	function ensureState(n: number) {
-		while (alphaIdx.length < n) {
-			alphaIdx.push(0);
-			nextStepAt.push(0);
-			cellAnims.push([]);
-			cellStartDelay.push(0);
-			cellSpeedMult.push(1);
+		if (alphaIdx.length >= n) {
+			while (cellAnims.length < n) cellAnims.push([]);
+			return;
 		}
+		const prev = alphaIdx.length;
+		const a = new Int32Array(n);
+		a.set(alphaIdx);
+		alphaIdx = a;
+		const b = new Float64Array(n);
+		b.set(nextStepAt);
+		nextStepAt = b;
+		const c = new Float64Array(n);
+		c.set(cellStartDelay);
+		cellStartDelay = c;
+		const d = new Float64Array(n);
+		d.set(cellSpeedMult);
+		for (let i = prev; i < n; i++) d[i] = 1;
+		cellSpeedMult = d;
+		while (cellAnims.length < n) cellAnims.push([]);
 	}
 
 	let rafId = 0;
@@ -617,7 +679,7 @@
 	function startLoop() {
 		if (running) return;
 		running = true;
-		rafId = requestAnimationFrame((t) => tick(t));
+		rafId = requestAnimationFrame(tick);
 	}
 
 	function tick(now: number) {
@@ -628,9 +690,11 @@
 
 			const ca = cellAnims[idx];
 			if (ca) {
-				for (let j = ca.length - 1; j >= 0; j--) {
-					if (now - ca[j].startTime >= DUR + SPRING_DUR) ca.splice(j, 1);
+				let write = 0;
+				for (let j = 0; j < ca.length; j++) {
+					if (now - ca[j].startTime < DUR + SPRING_DUR) ca[write++] = ca[j];
 				}
+				ca.length = write;
 			}
 
 			if ((!ca || ca.length === 0) && nextStepAt[idx] <= 0) {
@@ -643,10 +707,11 @@
 			updateCellInContent(idx);
 		}
 
+		settledThisFrame = settled;
 		renderFrame(now);
 
 		if (activeCells.size > 0) {
-			rafId = requestAnimationFrame((t) => tick(t));
+			rafId = requestAnimationFrame(tick);
 		} else {
 			running = false;
 		}
@@ -678,11 +743,11 @@
 			const structure = `${rowCount}x${cols}`;
 			if (structure !== prevStructure) {
 				prevStructure = structure;
-				alphaIdx = [];
-				nextStepAt = [];
+				alphaIdx = new Int32Array(0);
+				nextStepAt = new Float64Array(0);
 				cellAnims = [];
-				cellStartDelay = [];
-				cellSpeedMult = [];
+				cellStartDelay = new Float64Array(0);
+				cellSpeedMult = new Float64Array(0);
 				activeCells.clear();
 			}
 			recomputeSizes();
