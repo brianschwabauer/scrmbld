@@ -787,9 +787,16 @@
 			const SOUND_OFFSET = 230;
 			const playSound = () => {
 				if (!sound || soundQueue.length === 0) return;
-				const vol = volume / Math.sqrt(soundQueue.length);
+				const MAX_SOUNDS = 40;
+				let batch = soundQueue;
+				if (batch.length > MAX_SOUNDS) {
+					// Prioritize longest-running sounds so audio persists through the animation tail
+					batch.sort((a, b) => b.ticks * b.stagger + b.delay - (a.ticks * a.stagger + a.delay));
+					batch = batch.slice(0, MAX_SOUNDS);
+				}
+				const vol = volume / batch.length ** 0.3;
 				playSplitFlapBatch(
-					soundQueue.map((entry) => ({
+					batch.map((entry) => ({
 						ticks: entry.ticks,
 						delay: entry.stagger + 20,
 						offset: SOUND_OFFSET + entry.delay,
