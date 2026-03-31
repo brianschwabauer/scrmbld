@@ -52,27 +52,46 @@
 		});
 	}
 
-	// ── Raw text from URL ──────────────────────────────
-	const rawText = $derived(
-		(params.get('text') || DEFAULT_TEXT).replace(/\\n/g, '\n').slice(0, MAX_TEXT),
-	);
+	// ── Raw texts from URL (multiple screens) ──────────
+	const rawTexts = $derived.by(() => {
+		const all = params.getAll('text');
+		if (all.length === 0) return [DEFAULT_TEXT];
+		return all.map((t) => t.replace(/\\n/g, '\n').slice(0, MAX_TEXT));
+	});
 
 	// ── Tick counter for dynamic refresh ───────────────
 	let tick = $state(0);
 
 	$effect(() => {
 		if (!browser) return;
-		const hasSecond = /\{second\}/i.test(rawText);
-		const hasDynamic = /\{\w+\}/i.test(rawText);
+		const allText = rawTexts.join(' ');
+		const hasSecond = /\{second\}/i.test(allText);
+		const hasDynamic = /\{\w+\}/i.test(allText);
 		if (!hasDynamic) return;
 		const ms = hasSecond ? 1000 : 60_000;
 		const id = setInterval(() => tick++, ms);
 		return () => clearInterval(id);
 	});
 
-	const processedText = $derived.by(() => {
+	const processedTexts = $derived.by(() => {
 		tick;
-		return resolveTokens(rawText);
+		return rawTexts.map((t) => resolveTokens(t));
+	});
+
+	// ── Active screen cycling ──────────────────────────
+	let activeScreen = $state(0);
+	const interval = $derived(parseInt(params.get('interval') || '') || 15);
+
+	$effect(() => {
+		if (!browser || rawTexts.length <= 1) {
+			activeScreen = 0;
+			return;
+		}
+		activeScreen = 0;
+		const id = setInterval(() => {
+			activeScreen = (activeScreen + 1) % rawTexts.length;
+		}, interval * 1000);
+		return () => clearInterval(id);
 	});
 
 	// ── Word-wrap ──────────────────────────────────────
@@ -83,23 +102,18 @@
 				lines.push('');
 				continue;
 			}
-			// Walk through the paragraph preserving all spaces.
-			// Break at the last space that fits when a line exceeds cols.
 			let pos = 0;
 			while (pos < para.length) {
 				if (pos + cols >= para.length) {
-					// Rest of paragraph fits on one line
 					lines.push(para.slice(pos));
 					break;
 				}
-				// Find the last space within the cols limit to break at
 				const chunk = para.slice(pos, pos + cols + 1);
 				const breakAt = chunk.lastIndexOf(' ', cols);
 				if (breakAt > 0) {
 					lines.push(para.slice(pos, pos + breakAt));
-					pos += breakAt + 1; // skip past the breaking space
+					pos += breakAt + 1;
 				} else {
-					// No space found — hard break at cols
 					lines.push(para.slice(pos, pos + cols));
 					pos += cols;
 				}
@@ -115,17 +129,28 @@
 		return lines;
 	}
 
-	// ── Dimensions ─────────────────────────────────────
+	// ── Dimensions (from biggest screen) ───────────────
 	const autoCols = $derived.by(() => {
-		const paras = processedText.split('\n');
-		return Math.min(Math.max(...paras.map((p) => p.length), 5), MAX_COLS);
+		let maxLen = 5;
+		for (const text of processedTexts) {
+			for (const para of text.split('\n')) {
+				maxLen = Math.max(maxLen, para.length);
+			}
+		}
+		return Math.min(maxLen, MAX_COLS);
 	});
 
 	const cols = $derived(
 		Math.min(Math.max(parseInt(params.get('cols') || '') || autoCols, 1), MAX_COLS),
 	);
 
-	const autoRows = $derived(Math.min(Math.max(wrapText(processedText, cols).length, 1), MAX_ROWS));
+	const autoRows = $derived.by(() => {
+		let max = 1;
+		for (const text of processedTexts) {
+			max = Math.max(max, wrapText(text, cols).length);
+		}
+		return Math.min(max, MAX_ROWS);
+	});
 
 	const rows = $derived(
 		Math.min(Math.max(parseInt(params.get('rows') || '') || autoRows, 1), MAX_ROWS),
@@ -163,18 +188,18 @@
 					' ',
 				];
 		}
-		// Merge in any characters from the text that aren't already in the base alphabet
 		const baseSet = new Set(base);
 		const extra: string[] = [];
-		for (const ch of processedText.toUpperCase()) {
-			if (!baseSet.has(ch)) {
-				baseSet.add(ch);
-				extra.push(ch);
+		for (const text of processedTexts) {
+			for (const ch of text.toUpperCase()) {
+				if (!baseSet.has(ch)) {
+					baseSet.add(ch);
+					extra.push(ch);
+				}
 			}
 		}
-		// Insert extra characters before the trailing space so the flap cycles through them
 		if (extra.length) {
-			const space = base.pop()!; // remove trailing ' '
+			const space = base.pop()!;
 			base.push(...extra, space);
 		}
 		return base;
@@ -182,7 +207,8 @@
 
 	// ── Display lines ──────────────────────────────────
 	const displayLines = $derived.by(() => {
-		const wrapped = wrapText(processedText, cols);
+		const text = processedTexts[activeScreen] ?? processedTexts[0] ?? '';
+		const wrapped = wrapText(text, cols);
 		const lines = wrapped.slice(0, rows).map((l) => l.slice(0, cols));
 		while (lines.length < rows) lines.push('');
 		return lines;
@@ -193,38 +219,71 @@
 
 	// ── Settings panel ─────────────────────────────────
 	let settingsOpen = $state(false);
-	let sText = $state('');
+	let sScreens = $state<string[]>([]);
 	let sRows = $state('');
 	let sCols = $state('');
 	let sDuration = $state('');
 	let sStagger = $state('');
 	let sAlphabet = $state('default');
+	let sInterval = $state('');
 
 	function openSettings() {
-		sText = rawText;
+		sScreens = [...rawTexts];
 		sRows = params.get('rows') || '';
 		sCols = params.get('cols') || '';
 		sDuration = params.get('duration') || '';
 		sStagger = params.get('stagger') || '';
 		sAlphabet = params.get('alphabet') || 'default';
+		sInterval = params.get('interval') || '';
 		settingsOpen = true;
 	}
 
 	function applySettings() {
 		const url = new URL(page.url);
 		const p = url.searchParams;
+
+		p.delete('text');
+		const screens = sScreens.filter((s) => s.trim());
+		if (screens.length === 0) screens.push(DEFAULT_TEXT);
+		const isDefault = screens.length === 1 && screens[0] === DEFAULT_TEXT;
+		if (!isDefault) {
+			for (const s of screens) {
+				p.append('text', s);
+			}
+		}
+
 		function set(k: string, v: string, fallback = '') {
 			if (v && v !== fallback) p.set(k, v);
 			else p.delete(k);
 		}
-		set('text', sText, DEFAULT_TEXT);
 		set('rows', sRows);
 		set('cols', sCols);
 		set('duration', sDuration, '300');
 		set('stagger', sStagger);
 		set('alphabet', sAlphabet, 'default');
+		if (screens.length > 1) {
+			set('interval', sInterval, '15');
+		} else {
+			p.delete('interval');
+		}
 		goto(url.toString(), { replaceState: true });
 		settingsOpen = false;
+	}
+
+	function addScreen() {
+		sScreens = [...sScreens, ''];
+	}
+
+	function removeScreen(i: number) {
+		sScreens = sScreens.filter((_, idx) => idx !== i);
+	}
+
+	function moveScreen(from: number, to: number) {
+		if (to < 0 || to >= sScreens.length) return;
+		const arr = [...sScreens];
+		const [item] = arr.splice(from, 1);
+		arr.splice(to, 0, item);
+		sScreens = arr;
 	}
 </script>
 
@@ -243,6 +302,19 @@
 		<FlipGridCanvas lines={displayLines} {cols} {duration} {stagger} sound={!muted} {alphabet} />
 	{/key}
 </div>
+
+{#if rawTexts.length > 1}
+	<div class="screen-indicator">
+		{#each rawTexts as _, i}
+			<button
+				class="dot"
+				class:active={i === activeScreen}
+				onclick={() => (activeScreen = i)}
+				title="Screen {i + 1}"
+			></button>
+		{/each}
+	</div>
+{/if}
 
 <button
 	class="fab mute-fab"
@@ -295,10 +367,44 @@
 				<button class="close-btn" onclick={() => (settingsOpen = false)}>&times;</button>
 			</div>
 
-			<label>
-				<span>Text</span>
-				<textarea rows="3" bind:value={sText} placeholder={DEFAULT_TEXT}></textarea>
-			</label>
+			<div class="screens-section">
+				<div class="screens-header">
+					<span class="screens-label">Screens</span>
+					<button class="add-screen-btn" onclick={addScreen} use:ripple>+ Add</button>
+				</div>
+				{#each sScreens as _, i}
+					<div class="screen-item">
+						<div class="screen-item-header">
+							<span class="screen-number">Screen {i + 1}</span>
+							<div class="screen-actions">
+								<button
+									class="screen-action-btn"
+									onclick={() => moveScreen(i, i - 1)}
+									disabled={i === 0}
+									title="Move up"
+								>&#8593;</button>
+								<button
+									class="screen-action-btn"
+									onclick={() => moveScreen(i, i + 1)}
+									disabled={i === sScreens.length - 1}
+									title="Move down"
+								>&#8595;</button>
+								<button
+									class="screen-action-btn delete"
+									onclick={() => removeScreen(i)}
+									disabled={sScreens.length <= 1}
+									title="Remove screen"
+								>&times;</button>
+							</div>
+						</div>
+						<textarea
+							rows="3"
+							bind:value={sScreens[i]}
+							placeholder={i === 0 ? DEFAULT_TEXT : 'Screen text...'}
+						></textarea>
+					</div>
+				{/each}
+			</div>
 
 			<p class="tip">
 				Use \n for newlines. Dynamic tokens:
@@ -307,6 +413,20 @@
 				<code>{'{hour}'}</code> <code>{'{hour24}'}</code> <code>{'{minute}'}</code>
 				<code>{'{second}'}</code> <code>{'{ampm}'}</code>
 			</p>
+
+			{#if sScreens.length > 1}
+				<label>
+					<span>Screen interval (seconds)</span>
+					<input
+						type="number"
+						value={sInterval}
+						oninput={(e) => (sInterval = e.currentTarget.value)}
+						placeholder="15"
+						min="1"
+						max="3600"
+					/>
+				</label>
+			{/if}
 
 			<div class="field-row">
 				<label>
@@ -375,9 +495,6 @@
 
 <style lang="scss">
 	.display {
-		// Font-size scaled to fill the viewport based on grid dimensions.
-		// Each letter cell is 1.5em wide × 2em tall (FlipText .part: font-size 2em, width 0.75em, height 1em).
-		// Letter gap: ~0.1em, board padding: ~0.24em per row, row gap: 0.15em.
 		--tw: calc(1.6 * var(--cols) + 0.14);
 		--th: calc(2.39 * var(--rows) - 0.15);
 		font-size: min(calc((100vw - 2rem) / var(--tw)), calc((100dvh - 2rem) / var(--th)), 150px);
@@ -394,12 +511,37 @@
 		contain: layout style;
 		background-color: #222222;
 
-		// Remove compositor layer promotion from individual flap elements on this page.
-		// FlipText creates .part elements per letter (2 × maxFlaps), each with will-change which creates
-		// a separate compositor layer. During resize, the browser must resize every layer.
-		// Removing will-change lets the browser promote on-demand during animations instead.
 		:global(.flip-text .letters .part) {
 			will-change: auto !important;
+		}
+	}
+
+	.screen-indicator {
+		position: fixed;
+		bottom: 1rem;
+		left: 50%;
+		transform: translateX(-50%);
+		display: flex;
+		gap: 0.5rem;
+		z-index: 10;
+
+		.dot {
+			width: 0.6rem;
+			height: 0.6rem;
+			border-radius: 50%;
+			border: none;
+			padding: 0;
+			background: rgba(255, 255, 255, 0.25);
+			cursor: pointer;
+			transition: background 0.2s;
+
+			&.active {
+				background: #00b7a1;
+			}
+
+			&:hover:not(.active) {
+				background: rgba(255, 255, 255, 0.45);
+			}
 		}
 	}
 
@@ -478,6 +620,89 @@
 				&:hover {
 					color: #fff;
 					background: rgba(255, 255, 255, 0.1);
+				}
+			}
+		}
+
+		.screens-section {
+			display: flex;
+			flex-direction: column;
+			gap: 0.5rem;
+		}
+
+		.screens-header {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+
+			.screens-label {
+				font-size: 0.8rem;
+				color: #aaa;
+			}
+
+			.add-screen-btn {
+				background: none;
+				border: 1px solid #555;
+				color: #aaa;
+				padding: 0.2rem 0.5rem;
+				border-radius: 6px;
+				font-family: inherit;
+				font-size: 0.75rem;
+				cursor: pointer;
+				&:hover {
+					color: #fff;
+					border-color: #00b7a1;
+				}
+			}
+		}
+
+		.screen-item {
+			background: #2a2a2a;
+			border-radius: 8px;
+			padding: 0.5rem;
+			display: flex;
+			flex-direction: column;
+			gap: 0.25rem;
+		}
+
+		.screen-item-header {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+
+			.screen-number {
+				font-size: 0.75rem;
+				color: #888;
+			}
+
+			.screen-actions {
+				display: flex;
+				gap: 0.15rem;
+			}
+
+			.screen-action-btn {
+				background: none;
+				border: none;
+				color: #888;
+				cursor: pointer;
+				padding: 0.1rem 0.35rem;
+				border-radius: 4px;
+				font-size: 0.85rem;
+				line-height: 1;
+				font-family: inherit;
+
+				&:hover:not(:disabled) {
+					color: #fff;
+					background: rgba(255, 255, 255, 0.1);
+				}
+
+				&:disabled {
+					opacity: 0.3;
+					cursor: default;
+				}
+
+				&.delete:hover:not(:disabled) {
+					color: #ff6b6b;
 				}
 			}
 		}
