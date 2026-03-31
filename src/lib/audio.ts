@@ -71,6 +71,174 @@ export function initializeAudio(): void {
 	}
 }
 
+// ── Pre-rendered audio buffers ─────────────────────────────────────────────
+// Click variants: bandpass-filtered noise with baked-in envelope, generated
+// at different center frequencies for timbral variety. Reused across all
+// tick playback to avoid per-tick buffer allocation and filter node creation.
+
+const NUM_CLICK_VARIANTS = 8;
+let clickVariants: AudioBuffer[] | null = null;
+let cachedSwooshBuffer: AudioBuffer | null = null;
+let cachedSampleRate = 0;
+
+function ensureClickVariants(): AudioBuffer[] {
+	if (clickVariants && cachedSampleRate === audioContext!.sampleRate) return clickVariants;
+	const sr = audioContext!.sampleRate;
+	cachedSampleRate = sr;
+	clickVariants = [];
+
+	const duration = 0.04;
+	const samples = Math.ceil(sr * duration);
+
+	for (let v = 0; v < NUM_CLICK_VARIANTS; v++) {
+		const buf = audioContext!.createBuffer(1, samples, sr);
+		const data = buf.getChannelData(0);
+
+		// Generate white noise
+		const noise = new Float32Array(samples);
+		for (let i = 0; i < samples; i++) noise[i] = Math.random() * 2 - 1;
+
+		// Apply biquad bandpass filter (direct digital filter, avoids runtime BiquadFilterNode)
+		const freq = 5000 + (v / NUM_CLICK_VARIANTS) * 1000;
+		const Q = 2;
+		const w0 = (2 * Math.PI * freq) / sr;
+		const alpha = Math.sin(w0) / (2 * Q);
+		const b0 = alpha;
+		const b2 = -alpha;
+		const a0 = 1 + alpha;
+		const a1 = -2 * Math.cos(w0);
+		const a2 = 1 - alpha;
+
+		let x1 = 0,
+			x2 = 0,
+			y1 = 0,
+			y2 = 0;
+		for (let i = 0; i < samples; i++) {
+			const x = noise[i];
+			const y = (b0 * x + b2 * x2 - a1 * y1 - a2 * y2) / a0;
+			data[i] = y;
+			x2 = x1;
+			x1 = x;
+			y2 = y1;
+			y1 = y;
+		}
+
+		// Bake gain envelope: 1ms attack, exponential decay to 0.0001 at 30ms
+		for (let i = 0; i < samples; i++) {
+			const t = i / sr;
+			const env = t < 0.001 ? t / 0.001 : Math.pow(0.0001, (t - 0.001) / 0.029);
+			data[i] *= env;
+		}
+
+		clickVariants.push(buf);
+	}
+	return clickVariants;
+}
+
+function ensureSwooshBuffer(): AudioBuffer {
+	if (cachedSwooshBuffer && cachedSampleRate === audioContext!.sampleRate)
+		return cachedSwooshBuffer;
+	const sr = audioContext!.sampleRate;
+	const duration = 0.3;
+	const samples = Math.ceil(sr * duration);
+	cachedSwooshBuffer = audioContext!.createBuffer(1, samples, sr);
+	const data = cachedSwooshBuffer.getChannelData(0);
+	for (let i = 0; i < samples; i++) data[i] = Math.random() * 2 - 1;
+	return cachedSwooshBuffer;
+}
+
+// ── Batch playback ─────────────────────────────────────────────────────────
+
+export interface SplitFlapSoundEntry {
+	ticks: number;
+	delay: number; // ms between each tick
+	offset: number; // ms from now to start this sound
+	volume: number;
+}
+
+/**
+ * Efficiently schedules split-flap tick sounds for many letters at once.
+ *
+ * Uses pre-rendered click buffers (no per-tick buffer allocation or filter nodes)
+ * and one shared GainNode per sound (not per tick) for volume variation.
+ * Swooshes from sounds that end near the same time are merged.
+ */
+export function playSplitFlapBatch(sounds: SplitFlapSoundEntry[]): void {
+	if (!audioContext || !dryMixGain || !wetMixGain) return;
+	if (audioContext.state === 'suspended') audioContext.resume();
+	if (sounds.length === 0) return;
+
+	const clicks = ensureClickVariants();
+	const swooshBuf = ensureSwooshBuffer();
+	const now = audioContext.currentTime;
+	const numVariants = clicks.length;
+
+	const swooshCandidates: { time: number; vol: number }[] = [];
+
+	for (const snd of sounds) {
+		if (snd.ticks <= 0) continue;
+		const startSec = snd.offset / 1000;
+		const delaySec = snd.delay / 1000;
+
+		// One GainNode per sound — volume automation shared across all its ticks.
+		// Each tick sets the gain to a random volume; since the pre-rendered click
+		// decays to zero within 30ms and STAG > 30ms, ticks don't overlap.
+		const gain = audioContext.createGain();
+		gain.gain.value = 0;
+		gain.connect(dryMixGain);
+		gain.connect(wetMixGain);
+
+		for (let i = 0; i < snd.ticks; i++) {
+			const tickTime = now + startSec + i * delaySec;
+			const vol = (0.8 + (Math.random() - 0.5) * 0.2) * snd.volume;
+
+			gain.gain.setValueAtTime(vol, tickTime);
+
+			const source = audioContext.createBufferSource();
+			source.buffer = clicks[Math.floor(Math.random() * numVariants)];
+			source.connect(gain);
+			source.start(tickTime);
+		}
+
+		const lastTickTime = now + startSec + (snd.ticks - 1) * delaySec;
+		swooshCandidates.push({ time: lastTickTime + 0.02, vol: snd.volume });
+	}
+
+	// Merge swooshes that end within 200ms of each other
+	swooshCandidates.sort((a, b) => a.time - b.time);
+	const mergedSwooshes: { time: number; vol: number }[] = [];
+	for (const s of swooshCandidates) {
+		const last = mergedSwooshes[mergedSwooshes.length - 1];
+		if (last && s.time - last.time < 0.2) {
+			last.vol = Math.max(last.vol, s.vol);
+			last.time = Math.max(last.time, s.time);
+		} else {
+			mergedSwooshes.push({ time: s.time, vol: s.vol });
+		}
+	}
+
+	const swooshDuration = 0.3;
+	for (const s of mergedSwooshes) {
+		const source = audioContext.createBufferSource();
+		source.buffer = swooshBuf;
+		const filter = audioContext.createBiquadFilter();
+		const gain = audioContext.createGain();
+		source.connect(filter);
+		filter.connect(gain);
+		gain.connect(dryMixGain);
+		gain.connect(wetMixGain);
+		filter.type = 'bandpass';
+		filter.Q.value = 2.5;
+		filter.frequency.setValueAtTime(1000, s.time);
+		filter.frequency.exponentialRampToValueAtTime(500, s.time + swooshDuration);
+		const swooshVol = 0.1 * s.vol;
+		gain.gain.setValueAtTime(0, s.time);
+		gain.gain.linearRampToValueAtTime(swooshVol, s.time + 0.05);
+		gain.gain.linearRampToValueAtTime(0, s.time + swooshDuration);
+		source.start(s.time);
+	}
+}
+
 /**
  * Plays a series of realistic split-flap "tick" sounds, followed by a final "swoosh" and "clunk".
  * This function can be called multiple times concurrently to simulate multiple letters changing at once.
@@ -83,103 +251,14 @@ export function playSplitFlapSound(options?: {
 	delay?: number;
 	volume?: number;
 }): void {
-	const ticks = options?.ticks ?? 1;
-	const delayMs = options?.delay ?? 50;
-	const volume = options?.volume ?? 1;
-
-	if (ticks <= 0) return;
-
-	// initializeAudio(); // We'll initialize audio on first pointer down to comply with browser policies
-
-	if (!audioContext || !dryMixGain || !wetMixGain) {
-		console.warn('AudioContext not available. Sound cannot be played.');
-		return;
-	}
-
-	if (audioContext.state === 'suspended') {
-		audioContext.resume();
-	}
-
-	const now = audioContext.currentTime;
-	const delaySec = delayMs / 1000;
-
-	// Generate and Schedule the "Tick" Sounds
-	for (let i = 0; i < ticks; i++) {
-		const tickTime = now + i * delaySec;
-
-		// Use a BufferSource with white noise to create a non-tonal sound source.
-		const bufferSize = audioContext.sampleRate * 0.1; // 0.1s of noise is plenty
-		const buffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
-		const output = buffer.getChannelData(0);
-		for (let j = 0; j < bufferSize; j++) {
-			output[j] = Math.random() * 2 - 1;
-		}
-
-		const tickSource = audioContext.createBufferSource();
-		tickSource.buffer = buffer;
-
-		// A bandpass filter isolates a narrow band of frequencies from the noise,
-		// creating a sharper, more defined "click" sound.
-		const tickFilter = audioContext.createBiquadFilter();
-		tickFilter.type = 'bandpass';
-		tickFilter.frequency.value = 5000 + Math.random() * 1000; // Randomize for variety
-		tickFilter.Q.value = 2; // A high Q value makes the click sharper
-
-		const tickGain = audioContext.createGain();
-
-		// Connect the audio graph for the tick sound
-		tickSource.connect(tickFilter);
-		tickFilter.connect(tickGain);
-		tickGain.connect(dryMixGain);
-		tickGain.connect(wetMixGain);
-
-		// A very fast attack and decay envelope makes the sound percussive.
-		const tickVolume = (0.8 + (Math.random() - 0.5) * 0.2) * volume;
-		tickGain.gain.setValueAtTime(0, tickTime);
-		tickGain.gain.linearRampToValueAtTime(tickVolume, tickTime + 0.001); // Extremely fast attack
-		tickGain.gain.exponentialRampToValueAtTime(0.0001, tickTime + 0.03); // Quick decay
-
-		tickSource.start(tickTime);
-	}
-
-	const lastTickTime = now + (ticks - 1) * delaySec;
-
-	// Add a final "Swoosh" of air as the flap settles
-	const swooshTime = lastTickTime + 0.02; // Start just after the last tick
-	const swooshDuration = 0.3;
-
-	// Generate white noise for the swoosh sound
-	const bufferSize = audioContext.sampleRate * swooshDuration;
-	const swooshBuffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
-	const output = swooshBuffer.getChannelData(0);
-	for (let i = 0; i < bufferSize; i++) {
-		output[i] = Math.random() * 2 - 1;
-	}
-
-	const swooshSource = audioContext.createBufferSource();
-	swooshSource.buffer = swooshBuffer;
-
-	const swooshFilter = audioContext.createBiquadFilter();
-	const swooshGain = audioContext.createGain();
-
-	// Connect the swoosh audio chain
-	swooshSource.connect(swooshFilter);
-	swooshFilter.connect(swooshGain);
-	swooshGain.connect(dryMixGain);
-	swooshGain.connect(wetMixGain);
-
-	// Automate filter frequency and gain to create the "swoosh" effect
-	swooshFilter.type = 'bandpass';
-	swooshFilter.Q.value = 2.5;
-	swooshFilter.frequency.setValueAtTime(1000, swooshTime);
-	swooshFilter.frequency.exponentialRampToValueAtTime(500, swooshTime + swooshDuration);
-
-	const swooshVolume = 0.1 * volume;
-	swooshGain.gain.setValueAtTime(0, swooshTime);
-	swooshGain.gain.linearRampToValueAtTime(swooshVolume, swooshTime + 0.05); // Fade in
-	swooshGain.gain.linearRampToValueAtTime(0, swooshTime + swooshDuration); // Fade out
-
-	swooshSource.start(swooshTime);
+	playSplitFlapBatch([
+		{
+			ticks: options?.ticks ?? 1,
+			delay: options?.delay ?? 50,
+			offset: 0,
+			volume: options?.volume ?? 1,
+		},
+	]);
 }
 
 /**

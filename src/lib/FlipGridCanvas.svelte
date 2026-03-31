@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onDestroy, untrack } from 'svelte';
 	import { browser } from '$app/environment';
-	import { playSplitFlapSound } from './audio';
+	import { playSplitFlapBatch } from './audio';
 
 	let {
 		lines = [] as string[],
@@ -719,25 +719,18 @@
 			if (!needsAnim) renderFrame(now);
 		});
 		if (needsAnim) {
-			const MAX_SOUNDS = 10;
 			const SOUND_OFFSET = 230;
 			const playSound = () => {
 				if (!sound || soundQueue.length === 0) return;
-				// Prioritize longest sounds so ticks are audible as the last flaps settle
-				soundQueue.sort((a, b) => b.ticks - a.ticks);
-				const selected = soundQueue.slice(0, MAX_SOUNDS);
-				const vol = volume / Math.sqrt(selected.length);
-				for (const entry of selected) {
-					setTimeout(
-						() =>
-							playSplitFlapSound({
-								ticks: entry.ticks,
-								delay: entry.stagger + 20,
-								volume: vol,
-							}),
-						SOUND_OFFSET + entry.delay,
-					);
-				}
+				const vol = volume / Math.sqrt(soundQueue.length);
+				playSplitFlapBatch(
+					soundQueue.map((entry) => ({
+						ticks: entry.ticks,
+						delay: entry.stagger + 20,
+						offset: SOUND_OFFSET + entry.delay,
+						volume: vol,
+					})),
+				);
 			};
 			if (!hasAnimated && initialDelay > 0) {
 				hasAnimated = true;
