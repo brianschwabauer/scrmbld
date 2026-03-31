@@ -42,9 +42,9 @@
 		],
 		/** The callback for when one of the flip text characters is clicked */
 		onclick = undefined as ((index: number) => void) | undefined,
-	/** Max number of flap element pairs per letter. Lower = fewer DOM nodes = better performance.
-	 * Only 2–3 are ever visible at once; 10 is generous for the game, 3–4 suffices for dense displays. */
-	maxFlaps = 10,
+		/** Max number of flap element pairs per letter. Lower = fewer DOM nodes = better performance.
+		 * Only 2–3 are ever visible at once; 10 is generous for the game, 3–4 suffices for dense displays. */
+		maxFlaps = 10,
 	} = $props();
 	const DURATION = $derived(duration);
 	const STAGGER = $derived(stagger ?? Math.floor(duration * 0.2)); // number of ms between each letter animation

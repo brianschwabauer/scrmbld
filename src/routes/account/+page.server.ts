@@ -79,10 +79,7 @@ export const load = async ({ request, cookies, platform, url }) => {
 	// Backfill deviceId for legacy subscriptions (one-time lazy migration)
 	for (const sub of pushSubs) {
 		if (!sub.deviceId) {
-			const hash = await crypto.subtle.digest(
-				'SHA-256',
-				new TextEncoder().encode(sub.endpoint),
-			);
+			const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(sub.endpoint));
 			const computedId = Array.from(new Uint8Array(hash).slice(0, 8))
 				.map((b) => b.toString(16).padStart(2, '0'))
 				.join('');

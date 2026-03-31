@@ -2,7 +2,7 @@
 	import { browser } from '$app/environment';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import FlipText from '$lib/FlipText.svelte';
+	import FlipTextCanvas from '$lib/FlipTextCanvas.svelte';
 	import { ripple } from '$lib/ripple';
 	import { fade } from 'svelte/transition';
 
@@ -241,15 +241,7 @@
 <div class="display" style:--cols={cols} style:--rows={rows}>
 	{#key `${alphabetKey}|${duration}|${stagger ?? ''}`}
 		{#each displayLines as line, i (i)}
-			<FlipText
-				word={line}
-				minLength={cols}
-				{duration}
-				{stagger}
-				sound={!muted}
-				{alphabet}
-				maxFlaps={4}
-			/>
+			<FlipTextCanvas word={line} minLength={cols} {duration} {stagger} sound={!muted} {alphabet} />
 		{/each}
 	{/key}
 </div>
