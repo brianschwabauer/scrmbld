@@ -69,7 +69,9 @@
 		const hasDynamic = /\{\w+\}/i.test(allText);
 		if (!hasDynamic) return;
 		const ms = hasSecond ? 1000 : 60_000;
-		const id = setInterval(() => tick++, ms);
+		const id = setInterval(() => {
+			if (!document.hidden) tick++;
+		}, ms);
 		return () => clearInterval(id);
 	});
 
@@ -88,9 +90,12 @@
 			return;
 		}
 		activeScreen = 0;
-		const id = setInterval(() => {
-			activeScreen = (activeScreen + 1) % rawTexts.length;
-		}, interval * 1000);
+		const id = setInterval(
+			() => {
+				if (!document.hidden) activeScreen = (activeScreen + 1) % rawTexts.length;
+			},
+			Math.max(1000, interval * 1000),
+		);
 		return () => clearInterval(id);
 	});
 
@@ -299,7 +304,15 @@
 
 <div class="display" style:--cols={cols} style:--rows={rows}>
 	{#key `${alphabetKey}|${duration}|${stagger ?? ''}`}
-		<FlipGridCanvas lines={displayLines} {cols} {duration} {stagger} sound={!muted} {alphabet} initialDelay={500} />
+		<FlipGridCanvas
+			lines={displayLines}
+			{cols}
+			{duration}
+			{stagger}
+			sound={!muted}
+			{alphabet}
+			initialDelay={500}
+		/>
 	{/key}
 </div>
 
@@ -381,20 +394,20 @@
 									class="screen-action-btn"
 									onclick={() => moveScreen(i, i - 1)}
 									disabled={i === 0}
-									title="Move up"
-								>&#8593;</button>
+									title="Move up">&#8593;</button
+								>
 								<button
 									class="screen-action-btn"
 									onclick={() => moveScreen(i, i + 1)}
 									disabled={i === sScreens.length - 1}
-									title="Move down"
-								>&#8595;</button>
+									title="Move down">&#8595;</button
+								>
 								<button
 									class="screen-action-btn delete"
 									onclick={() => removeScreen(i)}
 									disabled={sScreens.length <= 1}
-									title="Remove screen"
-								>&times;</button>
+									title="Remove screen">&times;</button
+								>
 							</div>
 						</div>
 						<textarea

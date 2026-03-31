@@ -791,7 +791,7 @@
 		if (needsAnim) {
 			const SOUND_OFFSET = 230;
 			const playSound = () => {
-				if (!sound || soundQueue.length === 0) return;
+				if (!sound || soundQueue.length === 0 || document.hidden) return;
 				const MAX_SOUNDS = 40;
 				let batch = soundQueue;
 				if (batch.length > MAX_SOUNDS) {
@@ -851,6 +851,34 @@
 			rebuildCaches();
 			if (!running) renderFrame(performance.now());
 		});
+	});
+
+	// Pause animation while tab is hidden
+	let hideTime = 0;
+	$effect(() => {
+		if (!browser) return;
+		const onVisChange = () => {
+			if (document.hidden) {
+				hideTime = performance.now();
+				if (rafId) {
+					cancelAnimationFrame(rafId);
+					rafId = 0;
+				}
+			} else if (hideTime > 0) {
+				const pause = performance.now() - hideTime;
+				hideTime = 0;
+				for (const idx of activeCells) {
+					if (nextStepAt[idx] > 0) nextStepAt[idx] += pause;
+					const ca = cellAnims[idx];
+					if (ca) {
+						for (let j = 0; j < ca.length; j++) ca[j].startTime += pause;
+					}
+				}
+				if (running) rafId = requestAnimationFrame(tick);
+			}
+		};
+		document.addEventListener('visibilitychange', onVisChange);
+		return () => document.removeEventListener('visibilitychange', onVisChange);
 	});
 
 	onDestroy(() => {
