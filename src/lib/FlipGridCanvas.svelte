@@ -110,6 +110,16 @@
 	let textYOffset = 0;
 	let fontStr = '';
 
+	// ── Offscreen caches ───────────────────────────────────────────────────────
+	let spriteSheet: HTMLCanvasElement | undefined;
+	let tileW = 0;
+	let tileH = 0;
+	let alphaMap = new Map<string, number>();
+	let boardBgCanvas: HTMLCanvasElement | undefined;
+	let contentCanvas: HTMLCanvasElement | undefined;
+	let contentCtx: CanvasRenderingContext2D | null = null;
+	let activeCells = new Set<number>();
+
 	function recomputeSizes() {
 		if (!wrapper || !canvasEl) return;
 		em = parseFloat(getComputedStyle(wrapper).fontSize) || 16;
@@ -195,61 +205,218 @@
 		return g;
 	}
 
-	// ── Pre-rendered alphabet atlas ────────────────────────────────────────────
-	let atlasCache = new Map<string, HTMLCanvasElement>();
+	// ── Alphabet lookup ────────────────────────────────────────────────────────
+	function buildAlphaMap() {
+		alphaMap.clear();
+		for (let i = 0; i < alphabet.length; i++) {
+			alphaMap.set(alphabet[i], i);
+		}
+	}
 
-	function buildAtlas() {
-		atlasCache.clear();
-		for (const letter of alphabet) {
-			for (const isTop of [true, false]) {
-				const key = `${letter}|${isTop ? 'T' : 'B'}`;
-				const off = document.createElement('canvas');
-				off.width = Math.ceil(cellW * dpr);
-				off.height = Math.ceil(cellH * dpr);
-				const oc = off.getContext('2d')!;
-				oc.setTransform(dpr, 0, 0, dpr, 0, 0);
-				oc.fillStyle = makeGrad(oc, 0, 0, cellW, cellH, isTop);
-				oc.fillRect(0, 0, cellW, cellH);
-				if (letter) {
-					oc.font = fontStr;
-					oc.textAlign = 'center';
-					oc.textBaseline = 'middle';
-					oc.fillStyle = COLOR;
-					oc.fillText(letter, cellW / 2, cellH / 2 + textYOffset);
-				}
-				atlasCache.set(key, off);
+	// ── Single sprite-sheet atlas ──────────────────────────────────────────────
+	function buildSpriteSheet() {
+		if (!spriteSheet) spriteSheet = document.createElement('canvas');
+		tileW = Math.ceil(cellW * dpr);
+		tileH = Math.ceil(cellH * dpr);
+		const n = alphabet.length;
+		if (n === 0 || tileW === 0 || tileH === 0) return;
+		spriteSheet.width = n * tileW;
+		spriteSheet.height = 2 * tileH;
+		const sc = spriteSheet.getContext('2d')!;
+
+		for (let i = 0; i < n; i++) {
+			const letter = alphabet[i];
+
+			// Top variant
+			sc.save();
+			sc.translate(i * tileW, 0);
+			sc.scale(dpr, dpr);
+			sc.fillStyle = makeGrad(sc, 0, 0, cellW, cellH, true);
+			sc.fillRect(0, 0, cellW, cellH);
+			if (letter) {
+				sc.font = fontStr;
+				sc.textAlign = 'center';
+				sc.textBaseline = 'middle';
+				sc.fillStyle = COLOR;
+				sc.fillText(letter, cellW / 2, cellH / 2 + textYOffset);
+			}
+			sc.restore();
+
+			// Bottom variant
+			sc.save();
+			sc.translate(i * tileW, tileH);
+			sc.scale(dpr, dpr);
+			sc.fillStyle = makeGrad(sc, 0, 0, cellW, cellH, false);
+			sc.fillRect(0, 0, cellW, cellH);
+			if (letter) {
+				sc.font = fontStr;
+				sc.textAlign = 'center';
+				sc.textBaseline = 'middle';
+				sc.fillStyle = COLOR;
+				sc.fillText(letter, cellW / 2, cellH / 2 + textYOffset);
+			}
+			sc.restore();
+		}
+	}
+
+	// ── Board background cache ─────────────────────────────────────────────────
+	function buildBoardBg() {
+		if (!boardBgCanvas) boardBgCanvas = document.createElement('canvas');
+		const pw = Math.ceil(totalW * dpr);
+		const ph = Math.ceil(totalH * dpr);
+		if (pw === 0 || ph === 0) return;
+		boardBgCanvas.width = pw;
+		boardBgCanvas.height = ph;
+		const bc = boardBgCanvas.getContext('2d')!;
+		bc.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+		const nRows = rowCount;
+		const nCols = cols;
+
+		for (let row = 0; row < nRows; row++) {
+			const ry = row * (rowH + rowGap);
+
+			// Row background
+			rrPath(bc, 0, ry, rowW, rowH, boardR);
+			bc.fillStyle = '#282828';
+			bc.fill();
+
+			// Inset shadow
+			bc.save();
+			rrPath(bc, 0, ry, rowW, rowH, boardR);
+			bc.clip();
+			const ib = Math.max(1, 0.08 * em);
+			const tg = bc.createLinearGradient(0, ry, 0, ry + ib + 2);
+			tg.addColorStop(0, 'rgba(0,0,0,0.3)');
+			tg.addColorStop(1, 'rgba(0,0,0,0)');
+			bc.fillStyle = tg;
+			bc.fillRect(0, ry, rowW, ib + 2);
+			const lg = bc.createLinearGradient(0, 0, ib + 2, 0);
+			lg.addColorStop(0, 'rgba(0,0,0,0.3)');
+			lg.addColorStop(1, 'rgba(0,0,0,0)');
+			bc.fillStyle = lg;
+			bc.fillRect(0, ry, ib + 2, rowH);
+			bc.restore();
+
+			// Cell shadows and gap lines
+			for (let col = 0; col < nCols; col++) {
+				const cx = boardPad + col * (cellW + cellGap);
+				const cy = ry + boardPad;
+
+				// Cell shadow
+				bc.fillStyle = 'rgba(0,0,0,0.35)';
+				bc.fillRect(cx + 1, cy + 1, cellW + 1, cellH + 1);
+
+				// Gap line (cell content is clipped to top/bottom halves, so this stays visible)
+				const gx = Math.max(0, cx - boardPad);
+				const gw = Math.min(rowW, cx + cellW + boardPad) - gx;
+				bc.fillStyle = '#222222';
+				bc.fillRect(gx, cy + topClipY, gw, flapGap);
 			}
 		}
 	}
 
-	function getAtlas(letter: string, isTop: boolean): HTMLCanvasElement | undefined {
-		return atlasCache.get(`${letter}|${isTop ? 'T' : 'B'}`);
+	// ── Content canvas (full static frame) ─────────────────────────────────────
+	function buildContentCanvas() {
+		if (!contentCanvas) contentCanvas = document.createElement('canvas');
+		const pw = Math.ceil(totalW * dpr);
+		const ph = Math.ceil(totalH * dpr);
+		if (pw === 0 || ph === 0) return;
+		contentCanvas.width = pw;
+		contentCanvas.height = ph;
+		contentCtx = contentCanvas.getContext('2d')!;
+		contentCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+		// Draw background
+		if (boardBgCanvas) {
+			contentCtx.drawImage(
+				boardBgCanvas,
+				0,
+				0,
+				boardBgCanvas.width,
+				boardBgCanvas.height,
+				0,
+				0,
+				totalW,
+				totalH,
+			);
+		}
+
+		// Draw all cells from sprite sheet
+		const nCols = cols;
+		for (let row = 0; row < rowCount; row++) {
+			const ry = row * (rowH + rowGap);
+			for (let col = 0; col < nCols; col++) {
+				const idx = row * nCols + col;
+				const cx = boardPad + col * (cellW + cellGap);
+				const cy = ry + boardPad;
+				const letter = alphabet[alphaIdx[idx]] || '';
+				drawAtlasHalf(contentCtx, cx, cy, true, letter);
+				drawAtlasHalf(contentCtx, cx, cy, false, letter);
+			}
+		}
 	}
 
-	// ── Static half ────────────────────────────────────────────────────────────
-	function drawHalf(
+	function updateCellInContent(idx: number) {
+		if (!contentCtx || !boardBgCanvas || !spriteSheet) return;
+		const nCols = cols;
+		const row = Math.floor(idx / nCols);
+		const col = idx % nCols;
+		const ry = row * (rowH + rowGap);
+		const cx = boardPad + col * (cellW + cellGap);
+		const cy = ry + boardPad;
+
+		// Restore background for this cell region from cache
+		const sx = Math.round(cx * dpr);
+		const sy = Math.round(cy * dpr);
+		const sw = Math.ceil(cellW * dpr);
+		const sh = Math.ceil(cellH * dpr);
+		contentCtx.drawImage(boardBgCanvas, sx, sy, sw, sh, cx, cy, cellW, cellH);
+
+		// Draw updated cell content
+		const letter = alphabet[alphaIdx[idx]] || '';
+		drawAtlasHalf(contentCtx, cx, cy, true, letter);
+		drawAtlasHalf(contentCtx, cx, cy, false, letter);
+	}
+
+	function rebuildCaches() {
+		buildAlphaMap();
+		buildSpriteSheet();
+		buildBoardBg();
+		buildContentCanvas();
+	}
+
+	// ── Atlas half drawing ─────────────────────────────────────────────────────
+	function drawAtlasHalf(
 		c: CanvasRenderingContext2D,
 		cx: number,
 		cy: number,
 		isTop: boolean,
 		letter: string,
 	) {
-		const clipY = isTop ? cy : cy + bottomClipY;
-		const clipH = isTop ? topClipY : cellH - bottomClipY;
-		c.save();
-		c.beginPath();
-		c.rect(cx, clipY, cellW, clipH);
-		c.clip();
-		c.fillStyle = makeGrad(c, cx, cy, cellW, cellH, isTop);
-		c.fillRect(cx, cy, cellW, cellH);
-		if (letter) {
-			c.font = fontStr;
-			c.textAlign = 'center';
-			c.textBaseline = 'middle';
-			c.fillStyle = COLOR;
-			c.fillText(letter, cx + cellW / 2, cy + cellH / 2 + textYOffset);
+		if (!spriteSheet) return;
+		const li = alphaMap.get(letter);
+		if (li === undefined) return;
+
+		const srcX = li * tileW;
+		if (isTop) {
+			const srcH = Math.ceil(topClipY * dpr);
+			c.drawImage(spriteSheet, srcX, 0, tileW, srcH, cx, cy, cellW, topClipY);
+		} else {
+			const offY = Math.ceil(bottomClipY * dpr);
+			const srcH = tileH - offY;
+			c.drawImage(
+				spriteSheet,
+				srcX,
+				tileH + offY,
+				tileW,
+				srcH,
+				cx,
+				cy + bottomClipY,
+				cellW,
+				cellH - bottomClipY,
+			);
 		}
-		c.restore();
 	}
 
 	// ── Animated flap ──────────────────────────────────────────────────────────
@@ -257,11 +424,13 @@
 		c: CanvasRenderingContext2D,
 		cx: number,
 		cy: number,
-		off: HTMLCanvasElement,
+		srcX: number,
+		srcY: number,
 		isTop: boolean,
 		theta: number,
 		brightness: number,
 	) {
+		if (!spriteSheet) return;
 		const rotY = cellH / 2;
 		const ft = isTop ? 0 : bottomClipY;
 		const fb = isTop ? topClipY : cellH;
@@ -272,8 +441,6 @@
 			sinT = Math.sin(theta);
 		const dimAlpha = brightness < 1 ? 1 - brightness : 0;
 		const dimColor = dimAlpha > 0 ? `rgba(0,0,0,${dimAlpha})` : '';
-		const ow = off.width,
-			odpr = ow / cellW;
 
 		c.save();
 		c.beginPath();
@@ -296,13 +463,23 @@
 			const py0 = rotY + ly0 * cosT * ps0;
 			const py1 = rotY + ly1 * cosT * ps1;
 			const dY = cy + Math.min(py0, py1);
-			const dH = Math.abs(py1 - py0) + 0.5; // +0.5 overlap to prevent sub-pixel gaps between strips
+			const dH = Math.abs(py1 - py0) + 0.5;
 			if (dH < 0.05) continue;
 			const avgS = (ps0 + ps1) / 2;
 			const dW = cellW * avgS;
 			const dX = cx + (cellW - dW) / 2;
 
-			c.drawImage(off, 0, sy0 * odpr, ow, sh * odpr, dX, dY, dW, dH);
+			c.drawImage(
+				spriteSheet,
+				srcX,
+				srcY + Math.round(sy0 * dpr),
+				tileW,
+				Math.max(1, Math.round(sh * dpr)),
+				dX,
+				dY,
+				dW,
+				dH,
+			);
 
 			if (dimColor) {
 				c.fillStyle = dimColor;
@@ -312,101 +489,105 @@
 		c.restore();
 	}
 
-	// ── Full frame ─────────────────────────────────────────────────────────────
+	// ── Full frame render ──────────────────────────────────────────────────────
 	function renderFrame(now: number) {
-		if (!ctx) return;
+		if (!ctx || !contentCanvas) return;
 		const c = ctx;
-		c.clearRect(0, 0, totalW + 1, totalH + 1);
 
-		const nRows = rowCount;
+		// Stamp full content layer (background + static cell content)
+		c.drawImage(
+			contentCanvas,
+			0,
+			0,
+			contentCanvas.width,
+			contentCanvas.height,
+			0,
+			0,
+			totalW,
+			totalH,
+		);
+
+		if (activeCells.size === 0) return;
+
+		// Overdraw only active cells
 		const nCols = cols;
-
-		for (let row = 0; row < nRows; row++) {
+		for (const idx of activeCells) {
+			const row = Math.floor(idx / nCols);
+			const col = idx % nCols;
 			const ry = row * (rowH + rowGap);
+			const cx = boardPad + col * (cellW + cellGap);
+			const cy = ry + boardPad;
 
-			// Row board background
-			rrPath(c, 0, ry, rowW, rowH, boardR);
-			c.fillStyle = '#282828';
-			c.fill();
+			// Restore cell background from cache
+			if (boardBgCanvas) {
+				const sx = Math.round(cx * dpr);
+				const sy = Math.round(cy * dpr);
+				c.drawImage(
+					boardBgCanvas,
+					sx,
+					sy,
+					Math.ceil(cellW * dpr),
+					Math.ceil(cellH * dpr),
+					cx,
+					cy,
+					cellW,
+					cellH,
+				);
+			}
 
-			// Inset shadow
-			c.save();
-			rrPath(c, 0, ry, rowW, rowH, boardR);
-			c.clip();
-			const ib = Math.max(1, 0.08 * em);
-			const tg = c.createLinearGradient(0, ry, 0, ry + ib + 2);
-			tg.addColorStop(0, 'rgba(0,0,0,0.3)');
-			tg.addColorStop(1, 'rgba(0,0,0,0)');
-			c.fillStyle = tg;
-			c.fillRect(0, ry, rowW, ib + 2);
-			const lg = c.createLinearGradient(0, 0, ib + 2, 0);
-			lg.addColorStop(0, 'rgba(0,0,0,0.3)');
-			lg.addColorStop(1, 'rgba(0,0,0,0)');
-			c.fillStyle = lg;
-			c.fillRect(0, ry, ib + 2, rowH);
-			c.restore();
+			const ca = cellAnims[idx];
+			if (!ca || ca.length === 0) {
+				const letter = alphabet[alphaIdx[idx]] || '';
+				drawAtlasHalf(c, cx, cy, true, letter);
+				drawAtlasHalf(c, cx, cy, false, letter);
+				continue;
+			}
 
-			// Cells in this row
-			for (let col = 0; col < nCols; col++) {
-				const idx = row * nCols + col;
-				const cx = boardPad + col * (cellW + cellGap);
-				const cy = ry + boardPad;
+			const newest = ca[ca.length - 1];
+			const oldest = ca[0];
 
-				// Cell shadow
-				c.fillStyle = 'rgba(0,0,0,0.35)';
-				c.fillRect(cx + 1, cy + 1, cellW + 1, cellH + 1);
+			// Revealed halves
+			drawAtlasHalf(c, cx, cy, true, newest.newLetter);
+			drawAtlasHalf(c, cx, cy, false, oldest.oldLetter);
 
-				// Clip cell
-				c.save();
-				c.beginPath();
-				c.rect(cx, cy, cellW, cellH);
-				c.clip();
-
-				const ca = cellAnims[idx];
-				if (!ca || ca.length === 0) {
-					const letter = alphabet[alphaIdx[idx]] || '';
-					drawHalf(c, cx, cy, true, letter);
-					drawHalf(c, cx, cy, false, letter);
-				} else {
-					const newest = ca[ca.length - 1];
-					const oldest = ca[0];
-					drawHalf(c, cx, cy, true, newest.newLetter);
-					drawHalf(c, cx, cy, false, oldest.oldLetter);
-
-					// Top flaps
-					for (let j = ca.length - 1; j >= 0; j--) {
-						const a = ca[j];
-						const el = now - a.startTime;
-						if (el < DUR) {
-							const t = el / DUR;
-							const off = getAtlas(a.oldLetter, true);
-							if (off) drawFlap(c, cx, cy, off, true, -t * (Math.PI / 2), 1 - t * 0.5);
-						}
-					}
-
-					// Bottom flaps
-					for (let j = 0; j < ca.length; j++) {
-						const a = ca[j];
-						const el = now - a.startTime;
-						if (el >= DUR) {
-							const t2 = (el - DUR) / SPRING_DUR;
-							if (t2 >= 1) {
-								drawHalf(c, cx, cy, false, a.newLetter);
-								continue;
-							}
-							const s = spring(t2);
-							const off = getAtlas(a.newLetter, false);
-							if (off) drawFlap(c, cx, cy, off, false, (Math.PI / 2) * (1 - s), 0.5 + 0.5 * s);
-						}
+			// Top flaps (falling)
+			for (let j = ca.length - 1; j >= 0; j--) {
+				const a = ca[j];
+				const el = now - a.startTime;
+				if (el < DUR) {
+					const t = el / DUR;
+					const li = alphaMap.get(a.oldLetter);
+					if (li !== undefined) {
+						drawFlap(c, cx, cy, li * tileW, 0, true, -t * (Math.PI / 2), 1 - t * 0.5);
 					}
 				}
-				c.restore();
+			}
 
-				// Gap line
-				const gx = Math.max(0, cx - boardPad);
-				const gw = Math.min(rowW, cx + cellW + boardPad) - gx;
-				c.fillStyle = '#222222';
-				c.fillRect(gx, cy + topClipY, gw, flapGap);
+			// Bottom flaps (springing up)
+			for (let j = 0; j < ca.length; j++) {
+				const a = ca[j];
+				const el = now - a.startTime;
+				if (el >= DUR) {
+					const t2 = (el - DUR) / SPRING_DUR;
+					if (t2 >= 1) {
+						drawAtlasHalf(c, cx, cy, false, a.newLetter);
+						continue;
+					}
+					const s = spring(t2);
+					const li = alphaMap.get(a.newLetter);
+					if (li !== undefined) {
+						drawFlap(
+							c,
+							cx,
+							cy,
+							li * tileW,
+							tileH,
+							false,
+							(Math.PI / 2) * (1 - s),
+							0.5 + 0.5 * s,
+						);
+					}
+				}
 			}
 		}
 	}
@@ -439,22 +620,35 @@
 	}
 
 	function tick(now: number) {
-		let active = false;
-		const n = cellCount;
-		for (let i = 0; i < n; i++) {
-			if (nextStepAt[i] > 0 && now >= nextStepAt[i]) advanceStep(i, now);
-			const ca = cellAnims[i];
+		const settled: number[] = [];
+
+		for (const idx of activeCells) {
+			if (nextStepAt[idx] > 0 && now >= nextStepAt[idx]) advanceStep(idx, now);
+
+			const ca = cellAnims[idx];
 			if (ca) {
 				for (let j = ca.length - 1; j >= 0; j--) {
 					if (now - ca[j].startTime >= DUR + SPRING_DUR) ca.splice(j, 1);
 				}
-				if (ca.length > 0) active = true;
 			}
-			if (nextStepAt[i] > 0) active = true;
+
+			if ((!ca || ca.length === 0) && nextStepAt[idx] <= 0) {
+				settled.push(idx);
+			}
 		}
+
+		for (const idx of settled) {
+			activeCells.delete(idx);
+			updateCellInContent(idx);
+		}
+
 		renderFrame(now);
-		if (active) rafId = requestAnimationFrame((t) => tick(t));
-		else running = false;
+
+		if (activeCells.size > 0) {
+			rafId = requestAnimationFrame((t) => tick(t));
+		} else {
+			running = false;
+		}
 	}
 
 	function advanceStep(i: number, now: number) {
@@ -467,7 +661,7 @@
 			newLetter: alphabet[nxt] || '',
 		});
 		alphaIdx[i] = nxt;
-		const ti = alphabet.indexOf(targetChars[i]);
+		const ti = alphaMap.get(targetChars[i]) ?? -1;
 		nextStepAt[i] = nxt !== ti && ti >= 0 ? now + STAG : 0;
 	}
 
@@ -485,23 +679,26 @@
 				alphaIdx = [];
 				nextStepAt = [];
 				cellAnims = [];
+				activeCells.clear();
 			}
 			recomputeSizes();
 			ensureState(cellCount);
-			buildAtlas();
+			rebuildCaches();
 
 			const now = performance.now();
 			let maxDist = 0;
 
 			for (let i = 0; i < cellCount; i++) {
-				const ti = alphabet.indexOf(tc[i]);
+				const ti = alphaMap.get(tc[i]) ?? -1;
 				if (ti < 0 || alphaIdx[i] === ti) continue;
 				if (sound) {
-					const d = alphaIdx[i] <= ti ? ti - alphaIdx[i] : alphabet.length - alphaIdx[i] + ti;
+					const d =
+						alphaIdx[i] <= ti ? ti - alphaIdx[i] : alphabet.length - alphaIdx[i] + ti;
 					if (d > maxDist) maxDist = d;
 				}
 				if (nextStepAt[i] === 0) {
 					nextStepAt[i] = now;
+					activeCells.add(i);
 					needsAnim = true;
 				}
 			}
@@ -524,7 +721,7 @@
 		if (!wrapper) return;
 		resizeObs = new ResizeObserver(() => {
 			recomputeSizes();
-			buildAtlas();
+			rebuildCaches();
 			if (!running) renderFrame(performance.now());
 		});
 		resizeObs.observe(wrapper);
@@ -536,7 +733,7 @@
 		if (!browser) return;
 		document.fonts.ready.then(() => {
 			recomputeSizes();
-			buildAtlas();
+			rebuildCaches();
 			if (!running) renderFrame(performance.now());
 		});
 	});
