@@ -686,7 +686,12 @@
 		const settled: number[] = [];
 
 		for (const idx of activeCells) {
-			if (nextStepAt[idx] > 0 && now >= nextStepAt[idx]) advanceStep(idx, now);
+			// Catch up on all missed steps using their scheduled times (not now)
+			// so frame drops don't extend the animation beyond the sound duration
+			let safety = alphabet.length;
+			while (nextStepAt[idx] > 0 && now >= nextStepAt[idx] && --safety >= 0) {
+				advanceStep(idx, nextStepAt[idx]);
+			}
 
 			const ca = cellAnims[idx];
 			if (ca) {
@@ -717,18 +722,18 @@
 		}
 	}
 
-	function advanceStep(i: number, now: number) {
+	function advanceStep(i: number, scheduledTime: number) {
 		const cur = alphaIdx[i];
 		const nxt = (cur + 1) % alphabet.length;
 		while (cellAnims[i].length >= MAX_OVERLAPPING) cellAnims[i].shift();
 		cellAnims[i].push({
-			startTime: now,
+			startTime: scheduledTime,
 			oldLetter: alphabet[cur] || '',
 			newLetter: alphabet[nxt] || '',
 		});
 		alphaIdx[i] = nxt;
 		const ti = alphaMap.get(targetChars[i]) ?? -1;
-		nextStepAt[i] = nxt !== ti && ti >= 0 ? now + STAG * cellSpeedMult[i] : 0;
+		nextStepAt[i] = nxt !== ti && ti >= 0 ? scheduledTime + STAG * cellSpeedMult[i] : 0;
 	}
 
 	// ── Effects ────────────────────────────────────────────────────────────────
