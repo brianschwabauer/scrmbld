@@ -391,10 +391,13 @@
 				drawHalf(c, cx, cy, true, letter, color);
 				drawHalf(c, cx, cy, false, letter, color);
 			} else {
-				// One static background showing newest step's target letter
+				// Static top: show newest step's target (revealed behind flipping tops)
 				const newest = ca[ca.length - 1];
 				drawHalf(c, cx, cy, true, newest.newLetter, color);
-				drawHalf(c, cx, cy, false, newest.newLetter, color);
+				// Static bottom: show the letter from BEFORE the animation started.
+				// The oldest active step's oldLetter is the pre-animation resting letter.
+				const oldest = ca[0];
+				drawHalf(c, cx, cy, false, oldest.oldLetter, color);
 
 				// Top flaps: oldest-to-newest, each showing oldLetter top half folding down
 				for (let j = ca.length - 1; j >= 0; j--) {
@@ -415,7 +418,12 @@
 					const a = ca[j];
 					const el = now - a.startTime;
 					if (el >= DUR) {
-						const t2 = Math.min((el - DUR) / SPRING_DUR, 1);
+						const t2 = (el - DUR) / SPRING_DUR;
+						if (t2 >= 1) {
+							// Spring complete — draw as clean static half (avoids strip rounding artifacts)
+							drawHalf(c, cx, cy, false, a.newLetter, color);
+							continue;
+						}
 						const s = spring(t2);
 						const theta = (Math.PI / 2) * (1 - s);
 						const brightness = 0.5 + 0.5 * s;
