@@ -299,7 +299,7 @@
 
 <div class="display" style:--cols={cols} style:--rows={rows}>
 	{#key `${alphabetKey}|${duration}|${stagger ?? ''}`}
-		<FlipGridCanvas lines={displayLines} {cols} {duration} {stagger} sound={!muted} {alphabet} />
+		<FlipGridCanvas lines={displayLines} {cols} {duration} {stagger} sound={!muted} {alphabet} initialDelay={500} />
 	{/key}
 </div>
 

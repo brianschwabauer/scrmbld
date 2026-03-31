@@ -22,6 +22,7 @@
 			...Array.from({ length: 26 }, (_, i) => String.fromCharCode(65 + i)),
 			' ',
 		] as string[],
+		initialDelay = 0,
 	} = $props();
 
 	const STRIPS = 12;
@@ -610,6 +611,8 @@
 
 	let rafId = 0;
 	let running = false;
+	let hasAnimated = false;
+	let delayTimer = 0;
 
 	function startLoop() {
 		if (running) return;
@@ -670,6 +673,7 @@
 		if (!canvasEl || !wrapper) return;
 		const tc = targetChars;
 		let needsAnim = false;
+		let maxDist = 0;
 		untrack(() => {
 			const structure = `${rowCount}x${cols}`;
 			if (structure !== prevStructure) {
@@ -686,7 +690,6 @@
 			rebuildCaches();
 
 			const now = performance.now();
-			let maxDist = 0;
 
 			// Generate fresh per-cell jitter for this animation batch
 			for (let i = 0; i < cellCount; i++) {
@@ -708,16 +711,42 @@
 				}
 			}
 
-			if (sound && maxDist > 0) {
-				setTimeout(
-					() => playSplitFlapSound({ ticks: Math.min(maxDist, 40), delay: STAG + 10, volume }),
-					200,
-				);
-			}
-
 			if (!needsAnim) renderFrame(now);
 		});
-		if (needsAnim) startLoop();
+		if (needsAnim) {
+			const soundDelay = 200;
+			const playSound = () => {
+				if (sound && maxDist > 0) {
+					setTimeout(
+						() =>
+							playSplitFlapSound({
+								ticks: Math.min(maxDist, 40),
+								delay: STAG + 10,
+								volume,
+							}),
+						soundDelay,
+					);
+				}
+			};
+			if (!hasAnimated && initialDelay > 0) {
+				hasAnimated = true;
+				// Render static frame, then start animation after delay
+				renderFrame(performance.now());
+				delayTimer = window.setTimeout(() => {
+					// Re-anchor start times so the delay doesn't eat into the animation
+					const now2 = performance.now();
+					for (const idx of activeCells) {
+						nextStepAt[idx] = now2 + cellStartDelay[idx];
+					}
+					playSound();
+					startLoop();
+				}, initialDelay);
+			} else {
+				hasAnimated = true;
+				playSound();
+				startLoop();
+			}
+		}
 	});
 
 	// Resize observer
@@ -745,6 +774,7 @@
 
 	onDestroy(() => {
 		if (rafId) cancelAnimationFrame(rafId);
+		if (delayTimer) clearTimeout(delayTimer);
 		resizeObs?.disconnect();
 	});
 </script>
