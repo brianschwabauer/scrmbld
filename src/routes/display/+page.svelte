@@ -392,6 +392,7 @@
 		padding: 1rem;
 		box-sizing: border-box;
 		contain: layout style;
+		background-color: #222222;
 
 		// Remove compositor layer promotion from individual flap elements on this page.
 		// FlipText creates .part elements per letter (2 × maxFlaps), each with will-change which creates
