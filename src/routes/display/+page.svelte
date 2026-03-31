@@ -326,14 +326,14 @@
 	title={muted ? 'Unmute' : 'Mute'}
 >
 	{#if muted}
-		<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24"
+		<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
 			><path
 				fill="currentColor"
 				d="m19.8 22.6l-3.025-3.025q-.625.4-1.325.688t-1.45.462v-2.05q.35-.125.688-.25t.637-.3L12 14.8V20l-5-5H3V9h3.2L1.4 4.2l1.4-1.4l18.4 18.4zm-.2-5.8l-1.45-1.45q.425-.775.638-1.625t.212-1.75q0-2.35-1.375-4.2T14 5.275v-2.05q3.1.7 5.05 3.138T21 11.975q0 1.325-.363 2.55T19.6 16.8m-3.35-3.35L14 11.2V7.95q1.175.55 1.838 1.65T16.5 12q0 .375-.062.738t-.188.712M12 9.2L9.4 6.6L12 4z"
 			/></svg
 		>
 	{:else}
-		<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24"
+		<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
 			><path
 				fill="currentColor"
 				d="M14 20.725v-2.05q2.25-.65 3.625-2.5t1.375-4.2t-1.375-4.2T14 5.275v-2.05q3.1.7 5.05 3.138T21 11.975t-1.95 5.613T14 20.725M3 15V9h4l5-5v16l-5-5zm11 1V7.95q1.175.55 1.838 1.65T16.5 12q0 1.275-.663 2.363T14 16"
@@ -344,7 +344,7 @@
 
 <!-- svelte-ignore a11y_consider_explicit_label -->
 <button class="fab settings-fab" onpointerdown={openSettings} use:ripple title="Settings">
-	<svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24"
+	<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
 		><path
 			fill="currentColor"
 			d="m9.25 22l-.4-3.2q-.325-.125-.612-.3t-.563-.375L4.7 19.375l-2.75-4.75l2.575-1.95Q4.5 12.5 4.5 12.338v-.675q0-.163.025-.338L1.95 9.375l2.75-4.75l2.975 1.25q.275-.2.575-.375t.6-.3l.4-3.2h5.5l.4 3.2q.325.125.613.3t.562.375l2.975-1.25l2.75 4.75l-2.575 1.95q.025.175.025.338v.674q0 .163-.05.338l2.575 1.95l-2.75 4.75l-2.95-1.25q-.275.2-.575.375t-.6.3l-.4 3.2zM12 15.5q1.45 0 2.475-1.025T15.5 12t-1.025-2.475T12 8.5T9.525 9.525T8.5 12t1.025 2.475T12 15.5"
@@ -547,32 +547,32 @@
 
 	.fab {
 		position: fixed;
-		bottom: 1rem;
-		background-color: rgba(255, 255, 255, 0.05);
-		color: #dddddd;
+		bottom: 0.75rem;
+		background-color: transparent;
+		color: rgba(255, 255, 255, 0.2);
 		padding: 0;
 		border-radius: 999px;
-		width: 3.5rem;
-		height: 3.5rem;
+		width: 2.25rem;
+		height: 2.25rem;
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		backdrop-filter: blur(10px);
 		border: none;
 		cursor: pointer;
 		z-index: 10;
 		-webkit-tap-highlight-color: transparent;
+		transition: color 0.2s;
 		&:hover {
-			background-color: rgba(255, 255, 255, 0.1);
+			color: rgba(255, 255, 255, 0.5);
 		}
 	}
 
 	.mute-fab {
-		left: 1rem;
+		left: 0.75rem;
 	}
 
 	.settings-fab {
-		right: 1rem;
+		right: 0.75rem;
 	}
 
 	.settings-backdrop {
