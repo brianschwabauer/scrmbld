@@ -673,7 +673,7 @@
 		if (!canvasEl || !wrapper) return;
 		const tc = targetChars;
 		let needsAnim = false;
-		let maxDist = 0;
+		const soundQueue: { ticks: number; delay: number; stagger: number }[] = [];
 		untrack(() => {
 			const structure = `${rowCount}x${cols}`;
 			if (structure !== prevStructure) {
@@ -702,7 +702,12 @@
 				if (ti < 0 || alphaIdx[i] === ti) continue;
 				if (sound) {
 					const d = alphaIdx[i] <= ti ? ti - alphaIdx[i] : alphabet.length - alphaIdx[i] + ti;
-					if (d > maxDist) maxDist = d;
+					if (d > 0)
+						soundQueue.push({
+							ticks: Math.min(d, 40),
+							delay: cellStartDelay[i],
+							stagger: STAG * cellSpeedMult[i],
+						});
 				}
 				if (nextStepAt[i] === 0) {
 					nextStepAt[i] = now + cellStartDelay[i];
@@ -714,17 +719,23 @@
 			if (!needsAnim) renderFrame(now);
 		});
 		if (needsAnim) {
-			const soundDelay = 200;
+			const MAX_SOUNDS = 10;
+			const SOUND_OFFSET = 230;
 			const playSound = () => {
-				if (sound && maxDist > 0) {
+				if (!sound || soundQueue.length === 0) return;
+				// Prioritize longest sounds so ticks are audible as the last flaps settle
+				soundQueue.sort((a, b) => b.ticks - a.ticks);
+				const selected = soundQueue.slice(0, MAX_SOUNDS);
+				const vol = volume / Math.sqrt(selected.length);
+				for (const entry of selected) {
 					setTimeout(
 						() =>
 							playSplitFlapSound({
-								ticks: Math.min(maxDist, 40),
-								delay: STAG + 10,
-								volume,
+								ticks: entry.ticks,
+								delay: entry.stagger + 20,
+								volume: vol,
 							}),
-						soundDelay,
+						SOUND_OFFSET + entry.delay,
 					);
 				}
 			};
