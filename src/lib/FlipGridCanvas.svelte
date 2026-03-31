@@ -32,6 +32,9 @@
 	const STAG = $derived(stagger ?? Math.floor(duration * 0.2));
 	const COLOR = '#dddddd';
 
+	// 0 = all letters flip in perfect unison, 1 = maximum random variation
+	const JITTER = 0.4;
+
 	// ── Spring easing ──────────────────────────────────────────────────────────
 	const SP: [number, number][] = [
 		[0, 0],
@@ -576,16 +579,7 @@
 					const s = spring(t2);
 					const li = alphaMap.get(a.newLetter);
 					if (li !== undefined) {
-						drawFlap(
-							c,
-							cx,
-							cy,
-							li * tileW,
-							tileH,
-							false,
-							(Math.PI / 2) * (1 - s),
-							0.5 + 0.5 * s,
-						);
+						drawFlap(c, cx, cy, li * tileW, tileH, false, (Math.PI / 2) * (1 - s), 0.5 + 0.5 * s);
 					}
 				}
 			}
@@ -601,12 +595,16 @@
 	let alphaIdx: number[] = [];
 	let nextStepAt: number[] = [];
 	let cellAnims: StepAnim[][] = [];
+	let cellStartDelay: number[] = [];
+	let cellSpeedMult: number[] = [];
 
 	function ensureState(n: number) {
 		while (alphaIdx.length < n) {
 			alphaIdx.push(0);
 			nextStepAt.push(0);
 			cellAnims.push([]);
+			cellStartDelay.push(0);
+			cellSpeedMult.push(1);
 		}
 	}
 
@@ -662,7 +660,7 @@
 		});
 		alphaIdx[i] = nxt;
 		const ti = alphaMap.get(targetChars[i]) ?? -1;
-		nextStepAt[i] = nxt !== ti && ti >= 0 ? now + STAG : 0;
+		nextStepAt[i] = nxt !== ti && ti >= 0 ? now + STAG * cellSpeedMult[i] : 0;
 	}
 
 	// ── Effects ────────────────────────────────────────────────────────────────
@@ -679,6 +677,8 @@
 				alphaIdx = [];
 				nextStepAt = [];
 				cellAnims = [];
+				cellStartDelay = [];
+				cellSpeedMult = [];
 				activeCells.clear();
 			}
 			recomputeSizes();
@@ -688,16 +688,21 @@
 			const now = performance.now();
 			let maxDist = 0;
 
+			// Generate fresh per-cell jitter for this animation batch
+			for (let i = 0; i < cellCount; i++) {
+				cellStartDelay[i] = Math.random() * JITTER * DUR;
+				cellSpeedMult[i] = 1 + (Math.random() * 2 - 1) * JITTER * 0.5;
+			}
+
 			for (let i = 0; i < cellCount; i++) {
 				const ti = alphaMap.get(tc[i]) ?? -1;
 				if (ti < 0 || alphaIdx[i] === ti) continue;
 				if (sound) {
-					const d =
-						alphaIdx[i] <= ti ? ti - alphaIdx[i] : alphabet.length - alphaIdx[i] + ti;
+					const d = alphaIdx[i] <= ti ? ti - alphaIdx[i] : alphabet.length - alphaIdx[i] + ti;
 					if (d > maxDist) maxDist = d;
 				}
 				if (nextStepAt[i] === 0) {
-					nextStepAt[i] = now;
+					nextStepAt[i] = now + cellStartDelay[i];
 					activeCells.add(i);
 					needsAnim = true;
 				}
