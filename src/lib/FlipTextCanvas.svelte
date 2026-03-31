@@ -325,7 +325,7 @@
 			const py0 = rotY + ly0 * cosT * ps0;
 			const py1 = rotY + ly1 * cosT * ps1;
 			const dY = cy + Math.min(py0, py1);
-			const dH = Math.abs(py1 - py0);
+			const dH = Math.abs(py1 - py0) + 0.5; // +0.5 overlap to prevent sub-pixel gaps between strips
 			if (dH < 0.05) continue;
 			const avgS = (ps0 + ps1) / 2;
 			const dW = cellW * avgS;
